@@ -1,0 +1,8 @@
+# Railway – build & start (optionnel, les défauts conviennent si "start" = node dist/main)
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
