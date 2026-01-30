@@ -2,13 +2,16 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
+import * as sgMail from '@sendgrid/mail';
 import { UsersService } from '../users/users.service';
 import { UserDocument } from '../users/schemas/user.schema';
 import { RegisterDto } from './dto/register.dto';
@@ -17,6 +20,7 @@ import { GoogleAuthDto } from './dto/google-auth.dto';
 import { AppleAuthDto } from './dto/apple-auth.dto';
 
 const SALT_ROUNDS = 10;
+const RESET_TOKEN_EXPIRY_HOURS = 1;
 
 export interface AuthResponse {
   user: { id: string; name: string; email: string };
@@ -99,8 +103,47 @@ export class AuthService {
   }
 
   async resetPassword(email: string): Promise<void> {
-    // Stub: accept email, always return success (do not reveal if email exists)
-    await Promise.resolve(email);
+    const user = await this.usersService.findByEmail(email);
+    if (!user) {
+      return;
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+    (user as any).resetPasswordToken = token;
+    (user as any).resetPasswordExpires = expires;
+    await user.save();
+
+    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    const fromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL') ?? 'noreply@example.com';
+    const baseUrl = this.configService.get<string>('RESET_LINK_BASE_URL') ?? 'https://yourapp.com/reset-password';
+    const resetLink = `${baseUrl.replace(/\/$/, '')}?token=${token}`;
+
+    if (apiKey) {
+      sgMail.setApiKey(apiKey);
+      try {
+        await sgMail.send({
+          to: user.email,
+          from: fromEmail,
+          subject: 'Reset your password',
+          text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
+          html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+        });
+      } catch (err) {
+        console.error('[SendGrid] Reset email failed:', (err as Error).message);
+      }
+    }
+  }
+
+  async setNewPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByResetToken(token);
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    (user as any).password = hashedPassword;
+    (user as any).resetPasswordToken = null;
+    (user as any).resetPasswordExpires = null;
+    await user.save();
   }
 
   async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthResponse> {

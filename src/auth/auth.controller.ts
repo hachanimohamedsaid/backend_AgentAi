@@ -11,6 +11,7 @@ import { AuthService, AuthResponse } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SetNewPasswordDto } from './dto/set-new-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { AppleAuthDto } from './dto/apple-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -45,6 +46,14 @@ export class AuthController {
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     await this.authService.resetPassword(dto.email);
     return { message: 'If this email is registered, you will receive reset instructions.' };
+  }
+
+  /** Définir le nouveau mot de passe après clic sur le lien reçu par email (token dans le lien). */
+  @Post('reset-password/confirm')
+  @HttpCode(HttpStatus.OK)
+  async setNewPassword(@Body() dto: SetNewPasswordDto): Promise<{ message: string }> {
+    await this.authService.setNewPassword(dto.token, dto.newPassword);
+    return { message: 'Password has been reset. You can now sign in.' };
   }
 
   @Post('google')

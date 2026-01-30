@@ -35,6 +35,15 @@ export class UsersService {
     return this.userModel.findOne({ appleId }).exec();
   }
 
+  async findByResetToken(token: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        resetPasswordToken: token,
+        resetPasswordExpires: { $gt: new Date() },
+      })
+      .exec();
+  }
+
   async createUser(data: {
     name: string;
     email: string;

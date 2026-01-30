@@ -18,10 +18,17 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
 - Réponse 200 : `{ "user": { "id", "name", "email" }, "accessToken": "string" }`
 - Erreur 401 : identifiants incorrects
 
-### Réinitialisation mot de passe
+### Réinitialisation mot de passe (demande de lien)
 - **POST** `/auth/reset-password`
 - Body : `{ "email": "string" }`
 - Réponse 200 : `{ "message": "string" }`
+- Le backend envoie un email (SendGrid) avec un lien contenant `?token=xxx`. Lien valide 1h.
+
+### Définir le nouveau mot de passe (après clic sur le lien)
+- **POST** `/auth/reset-password/confirm`
+- Body : `{ "token": "string", "newPassword": "string" }` (token = paramètre du lien reçu par email)
+- Réponse 200 : `{ "message": "string" }`
+- Erreur 400 : token invalide ou expiré
 
 ### Connexion Google
 - **POST** `/auth/google`

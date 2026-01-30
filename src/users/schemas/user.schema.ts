@@ -20,6 +20,12 @@ export class User {
   @Prop({ type: String, default: null, sparse: true })
   appleId: string | null;
 
+  @Prop({ type: String, default: null })
+  resetPasswordToken: string | null;
+
+  @Prop({ type: Date, default: null })
+  resetPasswordExpires: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -32,6 +38,8 @@ UserSchema.set('toJSON', {
     delete ret.password;
     delete ret.googleId;
     delete ret.appleId;
+    delete ret.resetPasswordToken;
+    delete ret.resetPasswordExpires;
     delete ret.__v;
     ret.id = ret._id?.toString();
     delete ret._id;
