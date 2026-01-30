@@ -128,8 +128,10 @@ export class AuthService {
           text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
           html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
         });
-      } catch (err) {
-        console.error('[SendGrid] Reset email failed:', (err as Error).message);
+      } catch (err: any) {
+        const msg = err?.message ?? 'Unknown error';
+        const body = err?.response?.body ? JSON.stringify(err.response.body) : '';
+        console.error('[SendGrid] Reset email failed:', msg, body ? body : '');
       }
     }
   }
