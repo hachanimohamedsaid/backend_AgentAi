@@ -14,6 +14,18 @@ export class UpdateProfileDto {
   location?: string | null;
 
   @IsOptional()
+  @IsString()
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  birthDate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bio?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   conversationsCount?: number;

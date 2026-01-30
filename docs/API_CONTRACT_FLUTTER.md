@@ -51,6 +51,9 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
   "email": "string",
   "role": "string | null",
   "location": "string | null",
+  "phone": "string | null",
+  "birthDate": "string | null",
+  "bio": "string | null",
   "createdAt": "string | null",
   "conversationsCount": 0,
   "daysActive": 0,
@@ -59,6 +62,9 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
 ```
 - `role` : libellé affiché sous le nom (ex. "AI Enthusiast"). `null` si non renseigné.
 - `location` : ville/région (ex. "San Francisco, CA"). `null` si non renseigné.
+- `phone` : numéro de téléphone (ex. "+1 (555) 123-4567"). `null` si non renseigné.
+- `birthDate` : date de naissance au format "YYYY-MM-DD". `null` si non renseigné.
+- `bio` : bio / rôle (ex. "AI Enthusiast | Tech Explorer"). `null` si non renseigné.
 - `createdAt` : date d’inscription au format ISO (ex. "2024-01-15T…"). À afficher en "Joined January 2024".
 - `daysActive` : calculé côté backend (jours depuis l’inscription).
 - `conversationsCount` et `hoursSaved` : valeurs stockées (mise à jour par l’app si besoin).
@@ -67,7 +73,7 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
 ### Mise à jour du profil (protégé JWT)
 - **PATCH** `/auth/me`
 - Header : `Authorization: Bearer <accessToken>`
-- Body (tous les champs optionnels) : `{ "name"?: "string", "role"?: "string" | null, "location"?: "string" | null, "conversationsCount"?: number, "hoursSaved"?: number }`
+- Body (tous les champs optionnels) : `{ "name"?, "role"?, "location"?, "phone"?, "birthDate"?, "bio"?, "conversationsCount"?, "hoursSaved"? }`
 - Réponse 200 : `{ "message": "Profile updated" }`
 
 ---

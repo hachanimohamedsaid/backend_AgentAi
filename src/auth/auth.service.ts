@@ -270,6 +270,9 @@ export class AuthService {
       name?: string;
       role?: string | null;
       location?: string | null;
+      phone?: string | null;
+      birthDate?: string | null;
+      bio?: string | null;
       conversationsCount?: number;
       hoursSaved?: number;
     },

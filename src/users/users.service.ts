@@ -65,6 +65,13 @@ export class UsersService {
     if (dto.name !== undefined) (user as any).name = dto.name.trim();
     if (dto.role !== undefined) (user as any).role = dto.role;
     if (dto.location !== undefined) (user as any).location = dto.location;
+    if (dto.phone !== undefined) (user as any).phone = dto.phone;
+    if (dto.birthDate !== undefined) {
+      (user as any).birthDate = dto.birthDate
+        ? new Date(dto.birthDate)
+        : null;
+    }
+    if (dto.bio !== undefined) (user as any).bio = dto.bio;
     if (dto.conversationsCount !== undefined)
       (user as any).conversationsCount = dto.conversationsCount;
     if (dto.hoursSaved !== undefined)

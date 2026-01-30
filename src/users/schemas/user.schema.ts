@@ -32,6 +32,15 @@ export class User {
   @Prop({ type: String, default: null })
   location: string | null;
 
+  @Prop({ type: String, default: null })
+  phone: string | null;
+
+  @Prop({ type: Date, default: null })
+  birthDate: Date | null;
+
+  @Prop({ type: String, default: null })
+  bio: string | null;
+
   @Prop({ type: Number, default: 0 })
   conversationsCount: number;
 

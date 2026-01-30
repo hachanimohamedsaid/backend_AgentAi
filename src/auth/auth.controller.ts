@@ -80,6 +80,9 @@ export class AuthController {
     email: string;
     role: string | null;
     location: string | null;
+    phone: string | null;
+    birthDate: string | null;
+    bio: string | null;
     createdAt: string | null;
     conversationsCount: number;
     daysActive: number;
@@ -91,6 +94,9 @@ export class AuthController {
     const email = obj.email ?? user.email;
     const role = obj.role ?? (user as any).role ?? null;
     const location = obj.location ?? (user as any).location ?? null;
+    const phone = obj.phone ?? (user as any).phone ?? null;
+    const birthDate = (user as any).birthDate ?? obj.birthDate ?? null;
+    const bio = obj.bio ?? (user as any).bio ?? null;
     const createdAt = user.createdAt ?? (user as any).createdAt;
     const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
     const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
@@ -109,6 +115,9 @@ export class AuthController {
       email,
       role,
       location,
+      phone,
+      birthDate: birthDate ? new Date(birthDate).toISOString().slice(0, 10) : null,
+      bio,
       createdAt: createdAt ? new Date(createdAt).toISOString() : null,
       conversationsCount: Number(conversationsCount),
       daysActive,
