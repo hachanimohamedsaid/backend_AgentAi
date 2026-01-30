@@ -33,6 +33,13 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  /** Alias pour Flutter : même contrat que POST /auth/login */
+  @Post('signin')
+  @HttpCode(HttpStatus.OK)
+  async signin(@Body() dto: LoginDto): Promise<AuthResponse> {
+    return this.authService.login(dto);
+  }
+
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
