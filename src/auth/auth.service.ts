@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
-import * as sgMail from '@sendgrid/mail';
+import sgMail from '@sendgrid/mail';
 import { UsersService } from '../users/users.service';
 import { UserDocument } from '../users/schemas/user.schema';
 import { RegisterDto } from './dto/register.dto';
