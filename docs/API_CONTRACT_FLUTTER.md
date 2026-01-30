@@ -40,10 +40,35 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
 - Body : `{ "identityToken": "string", "user"?: "string" }`
 - Réponse 200 : `{ "user": { "id", "name", "email" }, "accessToken": "string" }`
 
-### Utilisateur connecté (protégé JWT)
+### Profil utilisateur connecté (protégé JWT) – données dynamiques pour la page Profile
 - **GET** `/auth/me`
 - Header : `Authorization: Bearer <accessToken>`
-- Réponse 200 : `{ "id", "name", "email" }`
+- Réponse 200 :
+```json
+{
+  "id": "string",
+  "name": "string",
+  "email": "string",
+  "role": "string | null",
+  "location": "string | null",
+  "createdAt": "string | null",
+  "conversationsCount": 0,
+  "daysActive": 0,
+  "hoursSaved": 0
+}
+```
+- `role` : libellé affiché sous le nom (ex. "AI Enthusiast"). `null` si non renseigné.
+- `location` : ville/région (ex. "San Francisco, CA"). `null` si non renseigné.
+- `createdAt` : date d’inscription au format ISO (ex. "2024-01-15T…"). À afficher en "Joined January 2024".
+- `daysActive` : calculé côté backend (jours depuis l’inscription).
+- `conversationsCount` et `hoursSaved` : valeurs stockées (mise à jour par l’app si besoin).
+- Après login, appeler **GET** `/auth/me` avec le `accessToken` et afficher ces champs sur la page Profile (plus de données statiques).
+
+### Mise à jour du profil (protégé JWT)
+- **PATCH** `/auth/me`
+- Header : `Authorization: Bearer <accessToken>`
+- Body (tous les champs optionnels) : `{ "name"?: "string", "role"?: "string" | null, "location"?: "string" | null, "conversationsCount"?: number, "hoursSaved"?: number }`
+- Réponse 200 : `{ "message": "Profile updated" }`
 
 ---
 

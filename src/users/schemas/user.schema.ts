@@ -26,6 +26,18 @@ export class User {
   @Prop({ type: Date, default: null })
   resetPasswordExpires: Date | null;
 
+  @Prop({ type: String, default: null })
+  role: string | null;
+
+  @Prop({ type: String, default: null })
+  location: string | null;
+
+  @Prop({ type: Number, default: 0 })
+  conversationsCount: number;
+
+  @Prop({ type: Number, default: 0 })
+  hoursSaved: number;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

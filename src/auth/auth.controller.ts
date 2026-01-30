@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Post,
   HttpCode,
   HttpStatus,
@@ -17,6 +18,7 @@ import { AppleAuthDto } from './dto/apple-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
+import { UpdateProfileDto } from '../users/dto/update-profile.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -70,12 +72,59 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser() user: UserDocument): Promise<{ id: string; name: string; email: string }> {
-    const obj = user.toJSON ? user.toJSON() : user;
+  async me(
+    @CurrentUser() user: UserDocument,
+  ): Promise<{
+    id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    location: string | null;
+    createdAt: string | null;
+    conversationsCount: number;
+    daysActive: number;
+    hoursSaved: number;
+  }> {
+    const obj = user.toJSON ? user.toJSON() : (user as any);
+    const id = obj.id ?? (user as any)._id?.toString();
+    const name = obj.name ?? user.name;
+    const email = obj.email ?? user.email;
+    const role = obj.role ?? (user as any).role ?? null;
+    const location = obj.location ?? (user as any).location ?? null;
+    const createdAt = user.createdAt ?? (user as any).createdAt;
+    const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
+    const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
+    const daysActive = createdAt
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000),
+          ),
+        )
+      : 0;
+
     return {
-      id: obj.id ?? (user as any)._id?.toString(),
-      name: obj.name ?? user.name,
-      email: obj.email ?? user.email,
+      id,
+      name,
+      email,
+      role,
+      location,
+      createdAt: createdAt ? new Date(createdAt).toISOString() : null,
+      conversationsCount: Number(conversationsCount),
+      daysActive,
+      hoursSaved: Number(hoursSaved),
     };
+  }
+
+  /** Mise à jour du profil (nom, rôle, localisation, stats). */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  async updateMe(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<{ message: string }> {
+    const userId = (user as any)._id?.toString();
+    await this.authService.updateProfile(userId, dto);
+    return { message: 'Profile updated' };
   }
 }

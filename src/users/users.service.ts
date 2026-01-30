@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { User, UserDocument } from './schemas/user.schema';
 
 @Injectable()
@@ -52,6 +53,22 @@ export class UsersService {
     appleId?: string | null;
   }): Promise<UserDocument> {
     const user = new this.userModel(data);
+    return user.save();
+  }
+
+  async updateProfile(
+    id: string,
+    dto: UpdateProfileDto,
+  ): Promise<UserDocument | null> {
+    const user = await this.userModel.findById(id).exec();
+    if (!user) return null;
+    if (dto.name !== undefined) (user as any).name = dto.name.trim();
+    if (dto.role !== undefined) (user as any).role = dto.role;
+    if (dto.location !== undefined) (user as any).location = dto.location;
+    if (dto.conversationsCount !== undefined)
+      (user as any).conversationsCount = dto.conversationsCount;
+    if (dto.hoursSaved !== undefined)
+      (user as any).hoursSaved = dto.hoursSaved;
     return user.save();
   }
 }

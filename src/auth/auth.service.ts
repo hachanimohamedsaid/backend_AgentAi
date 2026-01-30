@@ -263,4 +263,17 @@ export class AuthService {
   async validateUserById(userId: string): Promise<UserDocument | null> {
     return this.usersService.findById(userId);
   }
+
+  async updateProfile(
+    userId: string,
+    dto: {
+      name?: string;
+      role?: string | null;
+      location?: string | null;
+      conversationsCount?: number;
+      hoursSaved?: number;
+    },
+  ): Promise<UserDocument | null> {
+    return this.usersService.updateProfile(userId, dto);
+  }
 }
