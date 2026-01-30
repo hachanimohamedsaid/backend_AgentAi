@@ -18,4 +18,31 @@ export class UsersService {
   async findAll(): Promise<UserDocument[]> {
     return this.userModel.find().sort({ createdAt: -1 }).exec();
   }
+
+  async findById(id: string): Promise<UserDocument | null> {
+    return this.userModel.findById(id).exec();
+  }
+
+  async findByEmail(email: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ email: email.toLowerCase() }).exec();
+  }
+
+  async findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ googleId }).exec();
+  }
+
+  async findByAppleId(appleId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ appleId }).exec();
+  }
+
+  async createUser(data: {
+    name: string;
+    email: string;
+    password?: string | null;
+    googleId?: string | null;
+    appleId?: string | null;
+  }): Promise<UserDocument> {
+    const user = new this.userModel(data);
+    return user.save();
+  }
 }
