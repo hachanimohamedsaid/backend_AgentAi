@@ -54,7 +54,6 @@ export class AuthService {
   private async signToken(payload: { sub: string; email: string }): Promise<string> {
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
     return this.jwtService.signAsync(payload, {
-      subject: payload.sub,
       expiresIn: expiresIn as any,
     });
   }
