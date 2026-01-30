@@ -43,11 +43,11 @@ export class AuthService {
   }
 
   private toUserPayload(doc: UserDocument): { id: string; name: string; email: string } {
-    const obj = doc.toJSON ? doc.toJSON() : doc;
+    const id = (doc as any)._id?.toString?.() ?? '';
     return {
-      id: obj.id ?? obj._id?.toString(),
-      name: obj.name,
-      email: obj.email,
+      id,
+      name: doc.name ?? '',
+      email: doc.email ?? '',
     };
   }
 
