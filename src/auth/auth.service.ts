@@ -273,6 +273,7 @@ export class AuthService {
       phone?: string | null;
       birthDate?: string | null;
       bio?: string | null;
+      avatarUrl?: string | null;
       conversationsCount?: number;
       hoursSaved?: number;
     },

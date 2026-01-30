@@ -18,6 +18,7 @@ Document de référence pour consommer l’API backend NestJS depuis une applica
 7. [Récapitulatif des routes](#7-récapitulatif-des-routes)
 8. [Dépendances et environnements](#8-dépendances-et-environnements)
 9. [Page Change Password (formulaire dynamique)](#9-page-change-password-formulaire-dynamique)
+10. [Changer la photo de profil (ImgBB)](#10-changer-la-photo-de-profil-imgbb)
 
 ---
 
@@ -89,6 +90,7 @@ class ProfileModel {
   final String? phone;
   final String? birthDate;
   final String? bio;
+  final String? avatarUrl;
   final String? createdAt;
   final int conversationsCount;
   final int daysActive;
@@ -103,6 +105,7 @@ class ProfileModel {
     this.phone,
     this.birthDate,
     this.bio,
+    this.avatarUrl,
     this.createdAt,
     this.conversationsCount = 0,
     this.daysActive = 0,
@@ -119,6 +122,7 @@ class ProfileModel {
       phone: json['phone'] as String?,
       birthDate: json['birthDate'] as String?,
       bio: json['bio'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
       createdAt: json['createdAt'] as String?,
       conversationsCount: (json['conversationsCount'] as num?)?.toInt() ?? 0,
       daysActive: (json['daysActive'] as num?)?.toInt() ?? 0,
@@ -330,13 +334,14 @@ Future<ProfileModel> getProfile({required String accessToken}) async {
 ```
 
 - **Header** : `Authorization: Bearer <accessToken>`
-- **Succès** : 200 → `ProfileModel` (id, name, email, role, location, **phone**, **birthDate**, **bio**, createdAt, conversationsCount, daysActive, hoursSaved)
+- **Succès** : 200 → `ProfileModel` (id, name, email, role, location, phone, birthDate, bio, **avatarUrl**, createdAt, conversationsCount, daysActive, hoursSaved)
 - **Erreur** : 401 = non connecté ou token expiré
 
 **Champs à afficher sur la page Profile :**
 
 | Champ API | Affichage |
 |-----------|-----------|
+| `avatarUrl` | Photo de profil : si non null → `Image.network(profile.avatarUrl)` ; sinon initiale (ex. "M") |
 | `name` | Nom |
 | `email` | Email |
 | `role` | Sous-titre (ex. "AI Enthusiast") ; si null → "—" |
@@ -362,6 +367,7 @@ Future<void> updateProfile({
   String? phone,
   String? birthDate,
   String? bio,
+  String? avatarUrl,
   int? conversationsCount,
   int? hoursSaved,
 }) async {
@@ -372,6 +378,7 @@ Future<void> updateProfile({
   if (phone != null) body['phone'] = phone;
   if (birthDate != null) body['birthDate'] = birthDate;
   if (bio != null) body['bio'] = bio;
+  if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
   if (conversationsCount != null) body['conversationsCount'] = conversationsCount;
   if (hoursSaved != null) body['hoursSaved'] = hoursSaved;
 
@@ -388,7 +395,7 @@ Future<void> updateProfile({
 ```
 
 - **Header** : `Authorization: Bearer <accessToken>`
-- **Body** (tous optionnels) : `name`, `role`, `location`, `phone`, `birthDate`, `bio`, `conversationsCount`, `hoursSaved`
+- **Body** (tous optionnels) : `name`, `role`, `location`, `phone`, `birthDate`, `bio`, **`avatarUrl`** (URL de la photo après upload ImgBB), `conversationsCount`, `hoursSaved`
 - **Succès** : 200 → `{ "message": "Profile updated" }`
 
 ---
@@ -541,7 +548,7 @@ Future<void> loadProfile() async {
 | Connexion Google | POST | `/auth/google` | idToken |
 | Connexion Apple | POST | `/auth/apple` | identityToken, user? |
 | **Profil (données dynamiques)** | GET | `/auth/me` | Header: `Authorization: Bearer <token>` |
-| **Mise à jour profil** | PATCH | `/auth/me` | name?, role?, location?, phone?, birthDate?, bio?, conversationsCount?, hoursSaved? |
+| **Mise à jour profil** | PATCH | `/auth/me` | name?, role?, location?, phone?, birthDate?, bio?, **avatarUrl?**, conversationsCount?, hoursSaved? |
 | **Changer le mot de passe** | POST | `/auth/change-password` | currentPassword, newPassword ; Header: `Authorization: Bearer <token>` |
 | Santé backend | GET | `/health` | — |
 
@@ -670,6 +677,123 @@ Future<void> onSubmit() async {
 | Bouton "Update Password" | Désactiver tant que les champs sont invalides (optionnel) |
 | Submit | POST /auth/change-password avec token + currentPassword + newPassword |
 | Réponse API | Afficher succès ou message d’erreur (401 = mot de passe actuel incorrect) |
+
+---
+
+## 10. Changer la photo de profil (ImgBB)
+
+Pour que le bouton **"Tap to change photo"** (ou l’icône caméra) ouvre le sélecteur d’image, uploade la photo sur **ImgBB** et enregistre l’URL dans le profil :
+
+### 1. Dépendances Flutter
+
+```yaml
+dependencies:
+  image_picker: ^1.0.7
+  http: ^1.2.0
+```
+
+### 2. Clé API ImgBB
+
+- Crée une clé sur [https://api.imgbb.com/](https://api.imgbb.com/) ou utilise ta clé existante.
+- En Flutter, stocke-la de préférence en variable d’environnement ou dans un fichier non versionné (ex. `lib/config/imgbb_config.dart` avec `const String imgbbApiKey = 'TA_CLE_IMGBB';`). **Ne commite pas la clé** si le repo est public.
+
+### 3. Flux au clic sur "Tap to change photo"
+
+1. **Ouvrir le sélecteur** : `ImagePicker().pickImage(source: ImageSource.gallery)` (ou `ImageSource.camera`).
+2. **Lire le fichier** et le convertir en **base64**.
+3. **Uploader vers ImgBB** : POST `https://api.imgbb.com/1/upload` avec `key` et `image` (base64).
+4. **Récupérer l’URL** dans la réponse (ex. `data.url` ou `data.display_url`).
+5. **Enregistrer dans le profil** : **PATCH /auth/me** avec `avatarUrl: url` et le token.
+6. **Afficher** : si `profile.avatarUrl != null` → `Image.network(profile.avatarUrl)` ; sinon afficher l’initiale (ex. "M").
+
+### 4. Upload vers ImgBB (Dart)
+
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+
+/// Clé API ImgBB (à mettre en variable d'environnement ou config non versionnée en prod)
+const String imgbbApiKey = '9c78dd4d38eeed795d1ef908540d73e4'; // ou depuis .env
+
+/// Ouvre la galerie, uploade l'image sur ImgBB et retourne l'URL publique.
+Future<String?> pickAndUploadAvatar() async {
+  final picker = ImagePicker();
+  final XFile? file = await picker.pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 800,
+    maxHeight: 800,
+    imageQuality: 85,
+  );
+  if (file == null) return null;
+
+  final bytes = await file.readAsBytes();
+  final base64Image = base64Encode(bytes);
+
+  final res = await http.post(
+    Uri.parse('https://api.imgbb.com/1/upload?key=$imgbbApiKey'),
+    body: {'image': base64Image},
+  );
+
+  if (res.statusCode != 200) return null;
+  final data = jsonDecode(res.body);
+  final url = data['data']?['url'] ?? data['data']?['display_url'];
+  return url?.toString();
+}
+```
+
+### 5. Enregistrer l’URL dans le profil (PATCH /auth/me)
+
+Après avoir récupéré l’URL ImgBB :
+
+```dart
+Future<void> updateAvatarUrl(String accessToken, String avatarUrl) async {
+  await updateProfile(
+    accessToken: accessToken,
+    avatarUrl: avatarUrl,
+  );
+}
+```
+
+(Utilise la fonction `updateProfile` déjà documentée en section 3.8, en ne passant que `avatarUrl`.)
+
+### 6. Exemple dans l’écran Edit Profile
+
+```dart
+// Zone cliquable "Tap to change photo"
+GestureDetector(
+  onTap: () async {
+    final url = await pickAndUploadAvatar();
+    if (url == null) return; // annulé ou erreur
+    final token = await getToken();
+    if (token == null) return;
+    await updateProfile(accessToken: token, avatarUrl: url);
+    setState(() => _avatarUrl = url); // ou recharger le profil GET /auth/me
+  },
+  child: CircleAvatar(
+    radius: 50,
+    backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+    child: _avatarUrl == null ? Text(profile?.name?.substring(0, 1).toUpperCase() ?? 'M') : null,
+  ),
+)
+```
+
+### 7. Affichage sur la page Profile
+
+- Si `profile.avatarUrl != null` : `Image.network(profile.avatarUrl!, fit: BoxFit.cover)` (ou `CircleAvatar(backgroundImage: NetworkImage(profile.avatarUrl!))`).
+- Sinon : afficher l’initiale du nom (ex. "M") dans un `CircleAvatar` ou un conteneur avec fond.
+
+### 8. Récapitulatif
+
+| Étape | Action |
+|-------|--------|
+| 1 | Clic sur "Tap to change photo" ou icône caméra |
+| 2 | `ImagePicker().pickImage(source: gallery ou camera)` |
+| 3 | Lire le fichier, convertir en base64 |
+| 4 | POST `https://api.imgbb.com/1/upload?key=TA_CLE` avec `image: base64` |
+| 5 | Lire `data.data.url` (ou `display_url`) dans la réponse |
+| 6 | PATCH /auth/me avec `avatarUrl: url` + token |
+| 7 | Afficher l’avatar avec `NetworkImage(profile.avatarUrl)` ou l’initiale si null |
 
 ---
 

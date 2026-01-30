@@ -26,6 +26,10 @@ export class UpdateProfileDto {
   bio?: string | null;
 
   @IsOptional()
+  @IsString()
+  avatarUrl?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   conversationsCount?: number;

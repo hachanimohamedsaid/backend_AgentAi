@@ -23,6 +23,7 @@ Ce fichier contient tout ce dont tu as besoin pour connecter ton app Flutter au 
 | **7. Récapitulatif des routes** | Tableau de toutes les routes (méthode, URL, body / header) |
 | **8. Dépendances et environnements** | `http`, `shared_preferences`, URLs selon l’environnement |
 | **9. Page Change Password** | Formulaire dynamique : validation en temps réel + appel POST /auth/change-password |
+| **10. Photo de profil (ImgBB)** | Tap to change photo → image_picker → upload ImgBB → PATCH /auth/me avec avatarUrl |
 
 ---
 
@@ -57,4 +58,4 @@ Ce fichier contient tout ce dont tu as besoin pour connecter ton app Flutter au 
 
 ---
 
-*Pour implémenter la consommation de l’API dans ton projet Flutter, ouvre **DOCUMENTATION_CONSOMMATION_FLUTTER.md** et suis les sections 1 à 9.*
+*Pour implémenter la consommation de l’API dans ton projet Flutter, ouvre **DOCUMENTATION_CONSOMMATION_FLUTTER.md** et suis les sections 1 à 10.*

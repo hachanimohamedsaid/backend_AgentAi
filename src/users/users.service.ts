@@ -72,6 +72,7 @@ export class UsersService {
         : null;
     }
     if (dto.bio !== undefined) (user as any).bio = dto.bio;
+    if (dto.avatarUrl !== undefined) (user as any).avatarUrl = dto.avatarUrl;
     if (dto.conversationsCount !== undefined)
       (user as any).conversationsCount = dto.conversationsCount;
     if (dto.hoursSaved !== undefined)

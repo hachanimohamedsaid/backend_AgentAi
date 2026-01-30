@@ -84,6 +84,7 @@ export class AuthController {
     phone: string | null;
     birthDate: string | null;
     bio: string | null;
+    avatarUrl: string | null;
     createdAt: string | null;
     conversationsCount: number;
     daysActive: number;
@@ -98,6 +99,7 @@ export class AuthController {
     const phone = obj.phone ?? (user as any).phone ?? null;
     const birthDate = (user as any).birthDate ?? obj.birthDate ?? null;
     const bio = obj.bio ?? (user as any).bio ?? null;
+    const avatarUrl = obj.avatarUrl ?? (user as any).avatarUrl ?? null;
     const createdAt = user.createdAt ?? (user as any).createdAt;
     const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
     const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
@@ -119,6 +121,7 @@ export class AuthController {
       phone,
       birthDate: birthDate ? new Date(birthDate).toISOString().slice(0, 10) : null,
       bio,
+      avatarUrl,
       createdAt: createdAt ? new Date(createdAt).toISOString() : null,
       conversationsCount: Number(conversationsCount),
       daysActive,
