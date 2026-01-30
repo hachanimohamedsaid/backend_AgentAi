@@ -76,6 +76,14 @@ Base URL : `https://ton-backend.up.railway.app` ou `http://localhost:3000`
 - Body (tous les champs optionnels) : `{ "name"?, "role"?, "location"?, "phone"?, "birthDate"?, "bio"?, "conversationsCount"?, "hoursSaved"? }`
 - Réponse 200 : `{ "message": "Profile updated" }`
 
+### Changer le mot de passe (protégé JWT)
+- **POST** `/auth/change-password`
+- Header : `Authorization: Bearer <accessToken>`
+- Body : `{ "currentPassword": "string", "newPassword": "string" }` (newPassword min. 8 caractères)
+- Réponse 200 : `{ "message": "Password updated successfully" }`
+- Erreur 401 : mot de passe actuel incorrect ou token invalide
+- Erreur 400 : validation (ex. nouveau mot de passe trop court)
+
 ---
 
 ## Utilitaires

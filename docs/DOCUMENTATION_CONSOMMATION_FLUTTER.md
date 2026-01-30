@@ -17,6 +17,7 @@ Document de référence pour consommer l’API backend NestJS depuis une applica
 6. [Flux Profile et Edit Profile](#6-flux-profile-et-edit-profile)
 7. [Récapitulatif des routes](#7-récapitulatif-des-routes)
 8. [Dépendances et environnements](#8-dépendances-et-environnements)
+9. [Page Change Password (formulaire dynamique)](#9-page-change-password-formulaire-dynamique)
 
 ---
 
@@ -392,7 +393,39 @@ Future<void> updateProfile({
 
 ---
 
-### 3.9 Santé backend – GET /health
+### 3.9 Changer le mot de passe (utilisateur connecté) – POST /auth/change-password
+
+À appeler au clic sur **Update Password** dans la page Change Password (utilisateur déjà connecté).
+
+```dart
+Future<void> changePassword({
+  required String accessToken,
+  required String currentPassword,
+  required String newPassword,
+}) async {
+  final res = await http.post(
+    Uri.parse('$baseUrl/auth/change-password'),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $accessToken',
+    },
+    body: jsonEncode({
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    }),
+  );
+  if (res.statusCode != 200) throw _parseError(res);
+}
+```
+
+- **Header** : `Authorization: Bearer <accessToken>`
+- **Body** : `{ "currentPassword", "newPassword" }` (newPassword : min. 8 caractères)
+- **Succès** : 200 → `{ "message": "Password updated successfully" }`
+- **Erreur** : 401 = mot de passe actuel incorrect ou token invalide ; 400 = validation (ex. nouveau mot de passe trop court)
+
+---
+
+### 3.10 Santé backend – GET /health
 
 ```dart
 Future<bool> checkHealth() async {
@@ -509,6 +542,7 @@ Future<void> loadProfile() async {
 | Connexion Apple | POST | `/auth/apple` | identityToken, user? |
 | **Profil (données dynamiques)** | GET | `/auth/me` | Header: `Authorization: Bearer <token>` |
 | **Mise à jour profil** | PATCH | `/auth/me` | name?, role?, location?, phone?, birthDate?, bio?, conversationsCount?, hoursSaved? |
+| **Changer le mot de passe** | POST | `/auth/change-password` | currentPassword, newPassword ; Header: `Authorization: Bearer <token>` |
 | Santé backend | GET | `/health` | — |
 
 ---
@@ -533,6 +567,109 @@ dependencies:
 | iOS Simulator | `http://localhost:3000` |
 | App physique | IP de la machine ou URL Railway |
 | Production | `https://ton-backend.up.railway.app` |
+
+---
+
+---
+
+## 9. Page Change Password (formulaire dynamique)
+
+Pour que la page **Change Password** soit dynamique (validation en temps réel + appel API au submit) :
+
+### 1. Champs du formulaire
+
+- **Current Password** : mot de passe actuel (obligatoire).
+- **New Password** : nouveau mot de passe (obligatoire, min. 8 caractères).
+- **Confirm New Password** : doit être identique à New Password (validation côté client).
+
+### 2. Validation en temps réel (optionnel mais recommandé)
+
+Afficher dynamiquement les critères de force du **nouveau** mot de passe (ex. coches vertes / rouges) :
+
+| Critère | Vérification Dart |
+|--------|--------------------|
+| Au moins 8 caractères | `newPassword.length >= 8` |
+| Majuscules et minuscules | contient au moins une majuscule ET une minuscule (regex ou `contains`) |
+| Au moins un chiffre | `newPassword.contains(RegExp(r'[0-9]'))` |
+| Au moins un caractère spécial | `newPassword.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))` ou équivalent |
+
+Exemple de validation côté Flutter :
+
+```dart
+bool get hasMinLength => newPassword.length >= 8;
+bool get hasUpperAndLower => newPassword.contains(RegExp(r'[A-Z]')) && newPassword.contains(RegExp(r'[a-z]'));
+bool get hasDigit => newPassword.contains(RegExp(r'[0-9]'));
+bool get hasSpecial => newPassword.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;/]'));
+
+bool get isNewPasswordValid => hasMinLength && hasUpperAndLower && hasDigit && hasSpecial;
+```
+
+### 3. Validation avant envoi
+
+- **Current Password** : non vide.
+- **New Password** : respecte les critères ci-dessus (et min. 8 caractères pour l’API).
+- **Confirm New Password** : égal à New Password.
+
+Si une condition échoue : afficher un message d’erreur (snackbar / texte sous le champ) et ne pas appeler l’API.
+
+### 4. Appel API au clic sur "Update Password"
+
+1. Récupérer le **token** stocké (SharedPreferences / secure storage).
+2. Si pas de token : rediriger vers login.
+3. Appeler **POST** `$baseUrl/auth/change-password` avec :
+   - **Header** : `Authorization: Bearer <token>`
+   - **Body** : `{ "currentPassword": "<current>", "newPassword": "<new>" }`
+4. **Succès (200)** : afficher un message (ex. "Password updated successfully"), vider les champs, éventuellement revenir à l’écran précédent.
+5. **Erreur (401)** : afficher "Current password is incorrect" (ou le `message` renvoyé par l’API).
+6. **Erreur (400)** : afficher le `message` de validation (ex. "New password must be at least 8 characters").
+
+Exemple d’appel depuis l’écran :
+
+```dart
+Future<void> onSubmit() async {
+  if (currentPassword.isEmpty) {
+    showError('Enter current password');
+    return;
+  }
+  if (!isNewPasswordValid) {
+    showError('New password does not meet requirements');
+    return;
+  }
+  if (newPassword != confirmNewPassword) {
+    showError('Passwords do not match');
+    return;
+  }
+
+  final token = await getToken();
+  if (token == null) {
+    showError('Please log in again');
+    return;
+  }
+
+  try {
+    await api.changePassword(
+      accessToken: token,
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    showSuccess('Password updated successfully');
+    clearFields();
+    Navigator.pop(context);
+  } on Exception catch (e) {
+    showError(e.toString());
+  }
+}
+```
+
+### 5. Récapitulatif
+
+| Élément | Comportement dynamique |
+|--------|------------------------|
+| Critères du nouveau mot de passe | Mise à jour en temps réel (coches / couleurs) selon la saisie |
+| Confirm New Password | Vérifier égalité avec New Password avant submit |
+| Bouton "Update Password" | Désactiver tant que les champs sont invalides (optionnel) |
+| Submit | POST /auth/change-password avec token + currentPassword + newPassword |
+| Réponse API | Afficher succès ou message d’erreur (401 = mot de passe actuel incorrect) |
 
 ---
 

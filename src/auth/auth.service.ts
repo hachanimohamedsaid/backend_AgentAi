@@ -279,4 +279,28 @@ export class AuthService {
   ): Promise<UserDocument | null> {
     return this.usersService.updateProfile(userId, dto);
   }
+
+  /** Changer le mot de passe (utilisateur connecté, mot de passe actuel requis). */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (!user.password) {
+      throw new BadRequestException(
+        'This account has no password (signed in with Google/Apple). Use reset password instead.',
+      );
+    }
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    (user as any).password = hashedPassword;
+    await user.save();
+  }
 }

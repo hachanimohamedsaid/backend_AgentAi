@@ -13,6 +13,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetNewPasswordDto } from './dto/set-new-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { AppleAuthDto } from './dto/apple-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -123,6 +124,23 @@ export class AuthController {
       daysActive,
       hoursSaved: Number(hoursSaved),
     };
+  }
+
+  /** Changer le mot de passe (utilisateur connecté). */
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async changePassword(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const userId = (user as any)._id?.toString();
+    await this.authService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { message: 'Password updated successfully' };
   }
 
   /** Mise à jour du profil (nom, rôle, localisation, stats). */
