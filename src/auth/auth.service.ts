@@ -176,12 +176,11 @@ export class AuthService {
       if (user) {
         await this.usersService.linkGoogleId((user as any)._id.toString(), googleId);
       } else {
-        user = await this.usersService.createUser({
-          name,
+        user = await this.usersService.createFromGoogle({
           email,
-          password: null,
+          name,
           googleId,
-          avatarUrl: picture ?? null,
+          picture,
         });
       }
     }

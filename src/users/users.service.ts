@@ -61,6 +61,22 @@ export class UsersService {
     await this.userModel.updateOne({ _id: userId }, { googleId }).exec();
   }
 
+  /** Créer un utilisateur à partir des infos Google (sans mot de passe). */
+  async createFromGoogle(data: {
+    email: string;
+    name: string;
+    googleId: string;
+    picture?: string;
+  }): Promise<UserDocument> {
+    return this.createUser({
+      email: data.email.toLowerCase(),
+      name: data.name,
+      password: null,
+      googleId: data.googleId,
+      avatarUrl: data.picture ?? null,
+    });
+  }
+
   async updateProfile(
     id: string,
     dto: UpdateProfileDto,
