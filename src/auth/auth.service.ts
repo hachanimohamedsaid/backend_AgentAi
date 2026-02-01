@@ -29,7 +29,6 @@ export interface AuthResponse {
 
 @Injectable()
 export class AuthService {
-  private readonly googleClient: OAuth2Client | null = null;
   private readonly appleJwks = jwksRsa({
     jwksUri: 'https://appleid.apple.com/auth/keys',
     cache: true,
@@ -39,12 +38,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-  ) {
-    const googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    if (googleClientId) {
-      this.googleClient = new OAuth2Client(googleClientId);
-    }
-  }
+  ) {}
 
   private toUserPayload(doc: UserDocument): { id: string; name: string; email: string } {
     const id = (doc as any)._id?.toString?.() ?? '';
@@ -148,50 +142,58 @@ export class AuthService {
     await user.save();
   }
 
+  /**
+   * Connexion Google : vérifie l'idToken (audience = GOOGLE_CLIENT_ID), récupère ou crée l'utilisateur, renvoie user + JWT.
+   * Contrat Flutter : { user: { id, name, email }, accessToken }
+   */
   async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthResponse> {
-    if (!this.googleClient) {
-      throw new UnauthorizedException('Google sign-in is not configured');
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new UnauthorizedException('GOOGLE_CLIENT_ID not configured');
     }
+    const client = new OAuth2Client(clientId);
+    let ticket;
     try {
-      const ticket = await this.googleClient.verifyIdToken({
+      ticket = await client.verifyIdToken({
         idToken: dto.idToken,
+        audience: clientId,
       });
-      const payload = ticket.getPayload();
-      if (!payload?.email) {
-        throw new UnauthorizedException('Invalid Google token');
-      }
-      const googleId = payload.sub;
-      const email = payload.email.toLowerCase();
-      const name = payload.name ?? payload.email?.split('@')[0] ?? 'User';
-
-      let user = await this.usersService.findByGoogleId(googleId);
-      if (!user) {
-        user = await this.usersService.findByEmail(email);
-        if (user) {
-          (user as any).googleId = googleId;
-          await user.save();
-        } else {
-          user = await this.usersService.createUser({
-            name,
-            email,
-            password: null,
-            googleId,
-          });
-        }
-      }
-
-      const accessToken = await this.signToken({
-        sub: (user as any)._id.toString(),
-        email: user.email,
-      });
-      return {
-        user: this.toUserPayload(user),
-        accessToken,
-      };
-    } catch (e) {
-      if (e instanceof UnauthorizedException) throw e;
-      throw new UnauthorizedException('Invalid Google token');
+    } catch {
+      throw new UnauthorizedException('Invalid Google idToken');
     }
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      throw new UnauthorizedException('Google token missing email');
+    }
+    const googleId = payload.sub;
+    const email = payload.email.toLowerCase();
+    const name = payload.name ?? payload.email.split('@')[0] ?? 'User';
+    const picture = payload.picture ?? undefined;
+
+    let user = await this.usersService.findByGoogleId(googleId);
+    if (!user) {
+      user = await this.usersService.findByEmail(email);
+      if (user) {
+        await this.usersService.linkGoogleId((user as any)._id.toString(), googleId);
+      } else {
+        user = await this.usersService.createUser({
+          name,
+          email,
+          password: null,
+          googleId,
+          avatarUrl: picture ?? null,
+        });
+      }
+    }
+
+    const accessToken = await this.signToken({
+      sub: (user as any)._id.toString(),
+      email: user.email,
+    });
+    return {
+      user: this.toUserPayload(user),
+      accessToken,
+    };
   }
 
   private getAppleSigningKey = (header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) => {

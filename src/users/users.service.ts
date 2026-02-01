@@ -51,9 +51,14 @@ export class UsersService {
     password?: string | null;
     googleId?: string | null;
     appleId?: string | null;
+    avatarUrl?: string | null;
   }): Promise<UserDocument> {
     const user = new this.userModel(data);
     return user.save();
+  }
+
+  async linkGoogleId(userId: string, googleId: string): Promise<void> {
+    await this.userModel.updateOne({ _id: userId }, { googleId }).exec();
   }
 
   async updateProfile(
