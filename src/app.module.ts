@@ -27,6 +27,8 @@ import { AiModule } from './ai/ai.module';
         }
         return {
           uri,
+          serverSelectionTimeoutMS: 10000,
+          connectTimeoutMS: 10000,
           connectionFactory: (connection: { on: (ev: string, fn: () => void) => void }) => {
             connection.on('connected', () => {
               console.log('[Mongoose] Successfully connected to MongoDB Atlas.');
