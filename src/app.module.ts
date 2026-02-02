@@ -13,14 +13,15 @@ import { UsersModule } from './users/users.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
-    // MongoDB connection via Mongoose; URI from MONGO_URI env var
+    // MongoDB connection via Mongoose; URI from MONGO_URI or MONGODB_URI env var
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const uri = configService.get<string>('MONGO_URI');
+        const uri =
+          configService.get<string>('MONGO_URI') ?? configService.get<string>('MONGODB_URI');
         if (!uri) {
           throw new Error(
-            'MONGO_URI is not defined. Set it in .env or in your deployment environment (e.g. Railway).',
+            'MONGO_URI or MONGODB_URI is not defined. Set it in .env or in your deployment environment (e.g. Railway).',
           );
         }
         return {

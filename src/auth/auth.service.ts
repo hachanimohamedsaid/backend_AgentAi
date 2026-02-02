@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
-import sgMail from '@sendgrid/mail';
+import { Resend } from 'resend';
 import { UsersService } from '../users/users.service';
 import { UserDocument } from '../users/schemas/user.schema';
 import { RegisterDto } from './dto/register.dto';
@@ -107,25 +107,25 @@ export class AuthService {
     (user as any).resetPasswordExpires = expires;
     await user.save();
 
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
-    const fromEmail = this.configService.get<string>('SENDGRID_FROM_EMAIL') ?? 'noreply@example.com';
-    const baseUrl = this.configService.get<string>('RESET_LINK_BASE_URL') ?? 'https://yourapp.com/reset-password';
-    const resetLink = `${baseUrl.replace(/\/$/, '')}?token=${token}`;
+    const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    const emailFrom = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const frontendResetUrl =
+      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ?? 'https://yourapp.com/reset-password/confirm';
+    const resetLink = `${frontendResetUrl.replace(/\/$/, '')}?token=${token}`;
 
-    if (apiKey) {
-      sgMail.setApiKey(apiKey);
+    if (resendApiKey) {
+      const resend = new Resend(resendApiKey);
       try {
-        await sgMail.send({
+        await resend.emails.send({
+          from: emailFrom,
           to: user.email,
-          from: fromEmail,
           subject: 'Reset your password',
           text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
           html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
         });
       } catch (err: any) {
         const msg = err?.message ?? 'Unknown error';
-        const body = err?.response?.body ? JSON.stringify(err.response.body) : '';
-        console.error('[SendGrid] Reset email failed:', msg, body ? body : '');
+        console.error('[Resend] Reset email failed:', msg);
       }
     }
   }
