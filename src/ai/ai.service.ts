@@ -32,7 +32,7 @@ export class AiService {
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = hasSystemFromClient
       ? clientMessages
       : [
-          { role: 'system', content: "You are Buddy, a friendly and helpful voice assistant. Keep replies concise and natural for conversation." },
+          { role: 'system', content: "Tu es Buddy, un assistant vocal amical et utile. Réponds toujours en français. Garde tes réponses courtes et naturelles pour la conversation." },
           ...clientMessages,
         ];
 
@@ -43,11 +43,11 @@ export class AiService {
       });
 
       const content = completion.choices[0]?.message?.content?.trim();
-      return { message: content ?? "I'm not sure how to reply. Try again?" };
+      return { message: content ?? "Je ne suis pas sûr de comprendre. Réessaie ?" };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'OpenAI request failed';
       console.error('[AiService] OpenAI error:', msg);
-      return { message: "Sorry, I couldn't process that. Please try again later." };
+      return { message: "Désolé, je n'ai pas pu traiter ta demande. Réessaie plus tard." };
     }
   }
 
@@ -56,11 +56,11 @@ export class AiService {
     const userText = lastUser?.content?.trim() ?? '';
 
     if (!userText) {
-      return { message: "Hello! I'm Buddy. How can I help you today?" };
+      return { message: "Bonjour ! Je suis Buddy. Comment puis-je t'aider ?" };
     }
 
     return {
-      message: `You said: "${userText}". (Set OPENAI_API_KEY in .env for full AI replies.)`,
+      message: `Tu as dit : « ${userText} ». (Configure OPENAI_API_KEY dans .env pour les réponses IA complètes.)`,
     };
   }
 }
