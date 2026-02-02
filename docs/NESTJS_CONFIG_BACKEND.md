@@ -1,6 +1,6 @@
 # Configuration nécessaire – Backend NestJS
 
-Ce document récapitule **toute la configuration** à mettre en place dans le backend NestJS pour que l’app Flutter (login, register, Google Sign-In, reset password) fonctionne. Backend hébergé sur **Railway**.
+Ce document récapitule **toute la configuration** à mettre en place dans le backend NestJS pour que l’app Flutter (login, register, Google Sign-In, reset password, Talk to buddy) fonctionne. Backend hébergé sur **Railway**.
 
 ---
 
@@ -10,24 +10,28 @@ Ce document récapitule **toute la configuration** à mettre en place dans le ba
 
 | Variable | Obligatoire | Description | Exemple |
 |----------|-------------|-------------|--------|
-| **GOOGLE_CLIENT_ID** | Oui (si Google) | Même Client ID que Flutter (Web application). Ne pas mettre le client secret dans le front. | `1089118476895-xxx.apps.googleusercontent.com` |
+| **GOOGLE_CLIENT_ID** | Oui (si Google) | Même Client ID que Flutter (Web application). Ne pas mettre le client secret dans le front. | `1089118476895-a3snhfrv0lhbinp5409ikibpvdp1ke3j.apps.googleusercontent.com` |
 | **JWT_SECRET** | Oui | Secret pour signer les JWT (long, aléatoire). | `ton_secret_jwt_fort_et_long` |
 | **JWT_EXPIRES_IN** | Non | Durée de vie du JWT. | `7d` |
-| **MONGO_URI** ou **MONGODB_URI** | Oui (si MongoDB) | Chaîne de connexion MongoDB. | `mongodb+srv://...` ou `mongodb://localhost:27017/...` |
+| **MONGODB_URI** | Oui (si MongoDB) | Chaîne de connexion MongoDB. | `mongodb+srv://...` ou `mongodb://localhost:27017/...` |
 | **RESEND_API_KEY** | Oui (si reset password) | Clé API Resend (pas SendGrid). | `re_xxxxxxxxxxxx` |
 | **EMAIL_FROM** | Oui (si reset password) | Expéditeur des emails. | `onboarding@resend.dev` ou `noreply@tondomaine.com` |
 | **FRONTEND_RESET_PASSWORD_URL** | Oui (si reset password) | URL de la page « définir nouveau mot de passe » dans l’app Flutter. Le backend met dans l’email : cette URL + `?token=...` | En prod : `https://ton-app.web.app/reset-password/confirm` ; en dev : `http://localhost:8080/reset-password/confirm` |
+| **OPENAI_API_KEY** | Oui (si Talk to buddy) | Clé API OpenAI pour POST /ai/chat. | `sk-proj-...` |
+| **OPENAI_MODEL** | Non | Modèle OpenAI (défaut : `gpt-4o-mini`). | `gpt-4o-mini` ou `gpt-4o` |
+
+**Note :** Le backend accepte aussi **MONGO_URI** (prioritaire sur MONGODB_URI) pour la connexion MongoDB.
 
 **Exemple `.env` complet :**
 
 ```env
 # Auth
-GOOGLE_CLIENT_ID=1089118476895-xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=1089118476895-a3snhfrv0lhbinp5409ikibpvdp1ke3j.apps.googleusercontent.com
 JWT_SECRET=ton_secret_jwt_fort_et_long
 JWT_EXPIRES_IN=7d
 
-# Base de données (MONGO_URI ou MONGODB_URI)
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname
+# Base de données
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname
 
 # Email – Reset Password (Resend, pas SendGrid)
 RESEND_API_KEY=re_xxxxxxxxxxxx
@@ -61,15 +65,25 @@ npm install resend
 
 ```typescript
 // app.module.ts
-ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' })
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    // AuthModule, UsersModule, AiModule, etc.
+  ],
+})
+export class AppModule {}
 ```
 
-- **AuthModule** : importer `JwtModule` (avec `JWT_SECRET`, `JWT_EXPIRES_IN` depuis `ConfigService`), `UsersModule`. Le token de reset est stocké sur le schéma **User** (`resetPasswordToken`, `resetPasswordExpires`).
+- **AuthModule** : importer `JwtModule` (avec `JWT_SECRET`, `JWT_EXPIRES_IN` depuis `ConfigService`), `UsersModule`. Le token de reset est stocké sur le schéma **User** (`resetPasswordToken`, `resetPasswordExpires`), pas de schéma séparé PasswordResetToken.
 - **ValidationPipe** global : pour valider les DTO (body) avec `whitelist: true` (dans `main.ts`).
 
 ---
 
 ## 4. Routes API attendues par Flutter
+
+Le frontend appelle les endpoints suivants. Ils doivent exister et utiliser les variables ci-dessus.
 
 | Méthode | Route | Body (ex.) | Réponse / effet |
 |---------|--------|------------|------------------|
@@ -80,6 +94,9 @@ ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' })
 | POST | `/auth/reset-password/confirm` | `{ "token": "...", "newPassword": "..." }` | 200 OK (mot de passe mis à jour, token invalidé) |
 | GET | `/auth/me` | Header `Authorization: Bearer <accessToken>` | `{ "user" }` |
 | POST | `/auth/change-password` | Header + `{ "currentPassword", "newPassword" }` | 200 OK |
+| POST | `/ai/chat` | `{ "messages": [ { "role": "user"\|"assistant", "content": "..." } ] }` | `{ "message": "..." }` ou `{ "content": "..." }` (réponse IA pour Talk to buddy) |
+
+**Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et attend une réponse IA. Le backend appelle un LLM (ex. OpenAI) et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
 
 ---
 
@@ -94,8 +111,13 @@ ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' })
 - **Code** : voir `docs/NESTJS_EMAIL_RESET_PASSWORD_CODE.md` (schéma User avec `resetPasswordToken` / `resetPasswordExpires`, AuthService.resetPassword + setNewPassword, envoi email via Resend).
 
 ### Login / Register / JWT
-- **Variables** : `JWT_SECRET`, `JWT_EXPIRES_IN`, `MONGO_URI` ou `MONGODB_URI`.
+- **Variables** : `JWT_SECRET`, `JWT_EXPIRES_IN`, `MONGODB_URI` (ou MONGO_URI).
 - **Config** : `ConfigModule.forRoot()`, `JwtModule.registerAsync(...)` avec `ConfigService`.
+
+### Talk to buddy (POST /ai/chat)
+- **Variables** : `OPENAI_API_KEY` (obligatoire pour réponses IA), `OPENAI_MODEL` (optionnel, défaut : `gpt-4o-mini`).
+- **Route** : `POST /ai/chat` avec body `{ "messages": [ { "role", "content" } ] }`, réponse `{ "message": "..." }`.
+- **Implémentation** : module `AiModule`, `AiService` appelle l’API OpenAI quand `OPENAI_API_KEY` est défini ; sinon réponse factice.
 
 ---
 
@@ -120,5 +142,6 @@ Après modification des variables, Railway redéploie automatiquement. Vérifier
 | 7 | ValidationPipe global (whitelist: true) | |
 | 8 | Schéma User (googleId, resetPasswordToken, resetPasswordExpires) + UsersService (findByGoogleId, findByEmail, createFromGoogle, findByResetToken) | |
 | 9 | Token reset stocké sur User avec TTL 1h | |
+| 10 | POST /ai/chat (Talk to buddy) – voir module AiModule | |
 
-Une fois cette configuration en place, le backend NestJS (y compris sur Railway) est prêt pour le Flutter (login, register, Google Sign-In, reset password avec Resend).
+Une fois cette configuration en place, le backend NestJS (y compris sur Railway) est prêt pour le Flutter (login, register, Google Sign-In, reset password avec Resend, Talk to buddy).
