@@ -96,7 +96,7 @@ Le frontend appelle les endpoints suivants. Ils doivent exister et utiliser les 
 | POST | `/auth/change-password` | Header + `{ "currentPassword", "newPassword" }` | 200 OK |
 | POST | `/ai/chat` | `{ "messages": [ { "role": "system"\|"user"\|"assistant", "content": "..." } ] }` | `{ "message": "..." }` ou `{ "content": "..." }` (réponse IA pour Talk to buddy) |
 
-**Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et peut envoyer un premier message **system** (ex. « Répondre uniquement en arabe »). Le backend transmet tous les messages (y compris **system**) au LLM (ex. OpenAI) et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
+**Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et peut envoyer un premier message **system** (ex. « Répondre uniquement en français »). Si l'utilisateur est connecté, le frontend envoie le header **`Authorization: Bearer <accessToken>`** pour que le backend puisse identifier l'utilisateur et avoir accès aux données de son compte (profil, etc.). Le backend transmet tous les messages (y compris **system**) au LLM et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
 
 ---
 

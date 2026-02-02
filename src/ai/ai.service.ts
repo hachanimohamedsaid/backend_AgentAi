@@ -14,7 +14,10 @@ export interface ChatResponse {
 export class AiService {
   constructor(private readonly configService: ConfigService) {}
 
-  async chat(messages: { role: string; content: string }[]): Promise<ChatResponse> {
+  async chat(
+    messages: { role: string; content: string }[],
+    user?: { _id?: unknown; id?: string; email?: string; name?: string },
+  ): Promise<ChatResponse> {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
 
     if (!apiKey) {
