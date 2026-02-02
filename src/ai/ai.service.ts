@@ -23,13 +23,18 @@ export class AiService {
 
     const openai = new OpenAI({ apiKey });
 
-    const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: "You are Buddy, a friendly and helpful voice assistant. Keep replies concise and natural for conversation." },
-      ...messages.map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      })),
-    ];
+    const clientMessages: OpenAI.Chat.ChatCompletionMessageParam[] = messages.map((m) => ({
+      role: m.role as 'system' | 'user' | 'assistant',
+      content: m.content,
+    }));
+
+    const hasSystemFromClient = clientMessages.some((m) => m.role === 'system');
+    const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = hasSystemFromClient
+      ? clientMessages
+      : [
+          { role: 'system', content: "You are Buddy, a friendly and helpful voice assistant. Keep replies concise and natural for conversation." },
+          ...clientMessages,
+        ];
 
     try {
       const completion = await openai.chat.completions.create({

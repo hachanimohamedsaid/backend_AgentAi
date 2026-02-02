@@ -94,9 +94,9 @@ Le frontend appelle les endpoints suivants. Ils doivent exister et utiliser les 
 | POST | `/auth/reset-password/confirm` | `{ "token": "...", "newPassword": "..." }` | 200 OK (mot de passe mis à jour, token invalidé) |
 | GET | `/auth/me` | Header `Authorization: Bearer <accessToken>` | `{ "user" }` |
 | POST | `/auth/change-password` | Header + `{ "currentPassword", "newPassword" }` | 200 OK |
-| POST | `/ai/chat` | `{ "messages": [ { "role": "user"\|"assistant", "content": "..." } ] }` | `{ "message": "..." }` ou `{ "content": "..." }` (réponse IA pour Talk to buddy) |
+| POST | `/ai/chat` | `{ "messages": [ { "role": "system"\|"user"\|"assistant", "content": "..." } ] }` | `{ "message": "..." }` ou `{ "content": "..." }` (réponse IA pour Talk to buddy) |
 
-**Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et attend une réponse IA. Le backend appelle un LLM (ex. OpenAI) et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
+**Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et peut envoyer un premier message **system** (ex. « Répondre uniquement en arabe »). Le backend transmet tous les messages (y compris **system**) au LLM (ex. OpenAI) et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
 
 ---
 
