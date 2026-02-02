@@ -31,13 +31,33 @@ export class AiService {
       content: m.content,
     }));
 
+    const systemParts: string[] = [];
+
+    if (user?.name || user?.email) {
+      const name = user.name ?? 'non communiqué';
+      const email = user.email ?? 'non communiqué';
+      systemParts.push(
+        `L'utilisateur connecté est : prénom/nom = ${name}, email = ${email}.`,
+        "Quand l'utilisateur demande son nom, son identité ou « qui je suis », utilise ces informations pour répondre (ex. « Tu t'appelles " +
+          name +
+          ". »).",
+      );
+    }
+
+    const defaultBuddy =
+      "Tu es Buddy, un assistant vocal amical et utile. Réponds toujours en français. Garde tes réponses courtes et naturelles pour la conversation.";
     const hasSystemFromClient = clientMessages.some((m) => m.role === 'system');
-    const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = hasSystemFromClient
-      ? clientMessages
-      : [
-          { role: 'system', content: "Tu es Buddy, un assistant vocal amical et utile. Réponds toujours en français. Garde tes réponses courtes et naturelles pour la conversation." },
-          ...clientMessages,
-        ];
+    const userContextStr =
+      systemParts.length > 0 ? systemParts.join(' ') : '';
+
+    const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+    if (userContextStr) {
+      openaiMessages.push({ role: 'system', content: userContextStr });
+    }
+    if (!hasSystemFromClient) {
+      openaiMessages.push({ role: 'system', content: defaultBuddy });
+    }
+    openaiMessages.push(...clientMessages);
 
     try {
       const completion = await openai.chat.completions.create({

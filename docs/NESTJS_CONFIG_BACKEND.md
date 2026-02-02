@@ -98,6 +98,10 @@ Le frontend appelle les endpoints suivants. Ils doivent exister et utiliser les 
 
 **Talk to buddy (assistant vocal / chat)** : le frontend envoie **POST /ai/chat** avec la liste des messages (user + assistant) et peut envoyer un premier message **system** (ex. « Répondre uniquement en français »). Si l'utilisateur est connecté, le frontend envoie le header **`Authorization: Bearer <accessToken>`** pour que le backend puisse identifier l'utilisateur et avoir accès aux données de son compte (profil, etc.). Le backend transmet tous les messages (y compris **system**) au LLM et renvoie `{ "message": "..." }` ou `{ "content": "..." }`.
 
+### POST /ai/chat – Faire connaître à l'IA « qui est l'utilisateur » (données du compte)
+
+Pour que l'assistant puisse répondre à des questions comme « donne mon nom » ou « qui suis-je », le backend lit le JWT (header `Authorization: Bearer <accessToken>`), récupère nom et email de l'utilisateur connecté, et **injecte ces infos dans un message system** envoyé au LLM (avant les messages user/assistant). Exemple de contenu injecté : *« L'utilisateur connecté est : prénom/nom = [name], email = [email]. Quand l'utilisateur demande son nom, son identité ou « qui je suis », utilise ces informations pour répondre. »* Sans cette étape, le LLM ne peut pas savoir « qui est l'utilisateur ».
+
 ---
 
 ## 5. Résumé par fonctionnalité
@@ -142,6 +146,6 @@ Après modification des variables, Railway redéploie automatiquement. Vérifier
 | 7 | ValidationPipe global (whitelist: true) | |
 | 8 | Schéma User (googleId, resetPasswordToken, resetPasswordExpires) + UsersService (findByGoogleId, findByEmail, createFromGoogle, findByResetToken) | |
 | 9 | Token reset stocké sur User avec TTL 1h | |
-| 10 | POST /ai/chat (Talk to buddy) – voir module AiModule | |
+| 10 | POST /ai/chat : lire JWT (Authorization: Bearer), récupérer nom/email utilisateur, injecter dans le message **system** envoyé au LLM pour que l'assistant connaisse « qui est l'utilisateur » | |
 
 Une fois cette configuration en place, le backend NestJS (y compris sur Railway) est prêt pour le Flutter (login, register, Google Sign-In, reset password avec Resend, Talk to buddy).
