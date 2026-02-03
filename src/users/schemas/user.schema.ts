@@ -50,6 +50,9 @@ export class User {
   @Prop({ type: Number, default: 0 })
   hoursSaved: number;
 
+  @Prop({ type: Boolean, default: false })
+  emailVerified: boolean;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

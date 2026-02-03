@@ -52,13 +52,16 @@ export class UsersService {
     googleId?: string | null;
     appleId?: string | null;
     avatarUrl?: string | null;
+    emailVerified?: boolean;
   }): Promise<UserDocument> {
     const user = new this.userModel(data);
     return user.save();
   }
 
   async linkGoogleId(userId: string, googleId: string): Promise<void> {
-    await this.userModel.updateOne({ _id: userId }, { googleId }).exec();
+    await this.userModel
+      .updateOne({ _id: userId }, { googleId, emailVerified: true })
+      .exec();
   }
 
   /** Créer un utilisateur à partir des infos Google (sans mot de passe). */
@@ -74,6 +77,7 @@ export class UsersService {
       password: null,
       googleId: data.googleId,
       avatarUrl: data.picture ?? null,
+      emailVerified: true,
     });
   }
 

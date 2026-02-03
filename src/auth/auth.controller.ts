@@ -89,6 +89,7 @@ export class AuthController {
     conversationsCount: number;
     daysActive: number;
     hoursSaved: number;
+    emailVerified: boolean;
   }> {
     const obj = user.toJSON ? user.toJSON() : (user as any);
     const id = obj.id ?? (user as any)._id?.toString();
@@ -103,6 +104,7 @@ export class AuthController {
     const createdAt = user.createdAt ?? (user as any).createdAt;
     const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
     const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
+    const emailVerified = obj.emailVerified ?? (user as any).emailVerified ?? false;
     const daysActive = createdAt
       ? Math.max(
           0,
@@ -126,6 +128,7 @@ export class AuthController {
       conversationsCount: Number(conversationsCount),
       daysActive,
       hoursSaved: Number(hoursSaved),
+      emailVerified: Boolean(emailVerified),
     };
   }
 
