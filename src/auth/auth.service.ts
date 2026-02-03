@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -91,6 +92,12 @@ export class AuthService {
     token: string,
   ): Promise<void> {
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.error('[Resend] RESEND_API_KEY is not set – verification email not sent');
+      throw new ServiceUnavailableException(
+        'Email service is not configured. Set RESEND_API_KEY on the server.',
+      );
+    }
     const emailFrom =
       this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const verifyUrl =
@@ -98,20 +105,21 @@ export class AuthService {
       'https://yourapp.com/verify-email';
     const link = `${verifyUrl.replace(/\/$/, '')}?token=${token}`;
 
-    if (resendApiKey) {
-      const resend = new Resend(resendApiKey);
-      try {
-        await resend.emails.send({
-          from: emailFrom,
-          to: user.email,
-          subject: 'Verify your email address',
-          text: `Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h): ${link}`,
-          html: `<p>Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${link}">${link}</a></p>`,
-        });
-      } catch (err: any) {
-        const msg = err?.message ?? 'Unknown error';
-        console.error('[Resend] Verification email failed:', msg);
-      }
+    const resend = new Resend(resendApiKey);
+    try {
+      await resend.emails.send({
+        from: emailFrom,
+        to: user.email,
+        subject: 'Verify your email address',
+        text: `Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h): ${link}`,
+        html: `<p>Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${link}">${link}</a></p>`,
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? 'Unknown error';
+      console.error('[Resend] Verification email failed:', msg, err?.response?.data ?? '');
+      throw new ServiceUnavailableException(
+        'Could not send verification email. Try again later or check your email configuration (Resend domain, API key).',
+      );
     }
   }
 
@@ -189,25 +197,28 @@ export class AuthService {
     await user.save();
 
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!resendApiKey) {
+      console.error('[Resend] RESEND_API_KEY is not set – reset email not sent');
+      return; // reset-password is often "silent" (no leak of email existence), so we don't throw
+    }
     const emailFrom = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const frontendResetUrl =
       this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ?? 'https://yourapp.com/reset-password/confirm';
     const resetLink = `${frontendResetUrl.replace(/\/$/, '')}?token=${token}`;
 
-    if (resendApiKey) {
-      const resend = new Resend(resendApiKey);
-      try {
-        await resend.emails.send({
-          from: emailFrom,
-          to: user.email,
-          subject: 'Reset your password',
-          text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
-          html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
-        });
-      } catch (err: any) {
-        const msg = err?.message ?? 'Unknown error';
-        console.error('[Resend] Reset email failed:', msg);
-      }
+    const resend = new Resend(resendApiKey);
+    try {
+      await resend.emails.send({
+        from: emailFrom,
+        to: user.email,
+        subject: 'Reset your password',
+        text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
+        html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+      });
+    } catch (err: any) {
+      const msg = err?.message ?? 'Unknown error';
+      console.error('[Resend] Reset email failed:', msg, err?.response?.data ?? '');
+      // Don't throw for reset (same as before: avoid leaking whether email exists)
     }
   }
 
