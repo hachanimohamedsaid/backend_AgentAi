@@ -45,6 +45,15 @@ export class UsersService {
       .exec();
   }
 
+  async findByEmailVerificationToken(token: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({
+        emailVerificationToken: token,
+        emailVerificationExpires: { $gt: new Date() },
+      })
+      .exec();
+  }
+
   async createUser(data: {
     name: string;
     email: string;

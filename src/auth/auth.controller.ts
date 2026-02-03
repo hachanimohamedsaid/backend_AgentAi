@@ -13,6 +13,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetNewPasswordDto } from './dto/set-new-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { SendVerificationEmailDto } from './dto/send-verification-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { AppleAuthDto } from './dto/apple-auth.dto';
@@ -57,6 +59,39 @@ export class AuthController {
   async setNewPassword(@Body() dto: SetNewPasswordDto): Promise<{ message: string }> {
     await this.authService.setNewPassword(dto.token, dto.newPassword);
     return { message: 'Password has been reset. You can now sign in.' };
+  }
+
+  /** Envoi de l’email avec lien de vérification (utilisateur connecté, JWT requis). */
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async sendVerificationEmail(
+    @CurrentUser() user: UserDocument,
+  ): Promise<{ message: string }> {
+    const userId = (user as any)._id?.toString();
+    await this.authService.sendVerificationEmailForCurrentUser(userId);
+    return { message: 'If your email is not yet verified, you will receive a verification link.' };
+  }
+
+  /** Confirmation du token reçu par email (lien cliqué). Met emailVerified à true. */
+  @Post('verify-email/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmEmailVerification(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
+    await this.authService.verifyEmail(dto.token);
+    return { message: 'Email verified successfully.' };
+  }
+
+  /** Renvoyer l’email de vérification par adresse (sans JWT). */
+  @Post('send-verification-email')
+  @HttpCode(HttpStatus.OK)
+  async sendVerificationEmailByEmail(
+    @Body() dto: SendVerificationEmailDto,
+  ): Promise<{ message: string }> {
+    await this.authService.sendVerificationEmail(dto.email);
+    return {
+      message:
+        'If this email is registered and not yet verified, you will receive a verification link.',
+    };
   }
 
   @Post('google')

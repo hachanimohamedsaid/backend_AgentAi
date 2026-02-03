@@ -21,6 +21,7 @@ import { AppleAuthDto } from './dto/apple-auth.dto';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_EXPIRY_HOURS = 1;
+const VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
 
 export interface AuthResponse {
   user: { id: string; name: string; email: string };
@@ -67,6 +68,14 @@ export class AuthService {
       email: dto.email.toLowerCase().trim(),
       password: hashedPassword,
     });
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = expires;
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
     const accessToken = await this.signToken({
       sub: (user as any)._id.toString(),
       email: user.email,
@@ -75,6 +84,78 @@ export class AuthService {
       user: this.toUserPayload(user),
       accessToken,
     };
+  }
+
+  private async sendVerificationEmailToUser(
+    user: UserDocument,
+    token: string,
+  ): Promise<void> {
+    const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    const emailFrom =
+      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const verifyUrl =
+      this.configService.get<string>('FRONTEND_VERIFY_EMAIL_URL') ??
+      'https://yourapp.com/verify-email';
+    const link = `${verifyUrl.replace(/\/$/, '')}?token=${token}`;
+
+    if (resendApiKey) {
+      const resend = new Resend(resendApiKey);
+      try {
+        await resend.emails.send({
+          from: emailFrom,
+          to: user.email,
+          subject: 'Verify your email address',
+          text: `Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h): ${link}`,
+          html: `<p>Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${link}">${link}</a></p>`,
+        });
+      } catch (err: any) {
+        const msg = err?.message ?? 'Unknown error';
+        console.error('[Resend] Verification email failed:', msg);
+      }
+    }
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const user = await this.usersService.findByEmailVerificationToken(token);
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+    (user as any).emailVerified = true;
+    (user as any).emailVerificationToken = null;
+    (user as any).emailVerificationExpires = null;
+    await user.save();
+  }
+
+  /** Envoi email de vérification pour l’utilisateur connecté (JWT). Utilisé par POST /auth/verify-email. */
+  async sendVerificationEmailForCurrentUser(userId: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user || (user as any).emailVerified) {
+      return;
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = expires;
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
+  }
+
+  /** Renvoyer l’email de vérification par adresse email (sans JWT). POST /auth/send-verification-email. */
+  async sendVerificationEmail(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user || (user as any).emailVerified) {
+      return;
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = expires;
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {

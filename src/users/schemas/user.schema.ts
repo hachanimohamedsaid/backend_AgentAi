@@ -53,6 +53,12 @@ export class User {
   @Prop({ type: Boolean, default: false })
   emailVerified: boolean;
 
+  @Prop({ type: String, default: null })
+  emailVerificationToken: string | null;
+
+  @Prop({ type: Date, default: null })
+  emailVerificationExpires: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -67,6 +73,8 @@ UserSchema.set('toJSON', {
     delete ret.appleId;
     delete ret.resetPasswordToken;
     delete ret.resetPasswordExpires;
+    delete ret.emailVerificationToken;
+    delete ret.emailVerificationExpires;
     delete ret.__v;
     ret.id = ret._id?.toString();
     delete ret._id;
