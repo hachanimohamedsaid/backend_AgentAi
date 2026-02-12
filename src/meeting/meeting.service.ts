@@ -1,82 +1,90 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import {
-  MeetingDecisionDto,
-  DecisionEnum,
-} from './dto/decision.dto';
-import { MeetingDecision } from './schemas/meeting-decision.schema';
+  MeetingDecision,
+  MeetingDecisionDocument,
+} from './schemas/meeting-decision.schema';
 
 export interface DecisionResponse {
-  status: 'created' | 'rejected' | 'already_exists';
+  status: string;
   requestId: string;
   googleCalendarLink?: string;
 }
 
 @Injectable()
 export class MeetingService {
-  private readonly logger = new Logger(MeetingService.name);
-
   constructor(
     @InjectModel(MeetingDecision.name)
-    private readonly model: Model<MeetingDecision>,
+    private readonly meetingModel: Model<MeetingDecisionDocument>,
+    private readonly httpService: HttpService,
   ) {}
 
-  async handleDecision(
-    dto: MeetingDecisionDto,
-  ): Promise<DecisionResponse> {
-    if (!dto?.requestId) {
-      throw new BadRequestException('requestId is required');
-    }
+  async handleDecision(dto: any): Promise<DecisionResponse> {
+    const {
+      meetingDate,
+      meetingTime,
+      decision,
+      durationMinutes,
+      requestId,
+      userEmail,
+      userTimezone,
+    } = dto;
 
-    const existing = await this.model
-      .findOne({ requestId: dto.requestId })
-      .exec();
+    // Save initial decision
+    const created = await this.meetingModel.create({
+      meetingDate,
+      meetingTime,
+      decision,
+      durationMinutes,
+      requestId,
+    });
 
-    if (existing) {
-      return {
-        status: 'already_exists',
-        requestId: dto.requestId,
-      };
-    }
+    try {
+      // Call n8n webhook
+      const response = await firstValueFrom(
+        this.httpService.post(
+          'http://localhost:5678/webhook-test/meeting/decision',
+          {
+            meetingDate,
+            meetingTime,
+            decision,
+            durationMinutes,
+            requestId,
+            userEmail,
+            userTimezone,
+          },
+        ),
+      );
 
-    const base = {
-      meetingDate: dto.meetingDate,
-      meetingTime: dto.meetingTime,
-      decision: dto.decision,
-      durationMinutes: dto.durationMinutes,
-      requestId: dto.requestId,
-    };
+      const googleCalendarLink =
+        response?.data?.googleCalendarLink || null;
 
-    if (dto.decision === DecisionEnum.REJECT) {
-      await new this.model(base).save();
-      return {
-        status: 'rejected',
-        requestId: dto.requestId,
-      };
-    }
-
-    if (dto.decision === DecisionEnum.ACCEPT) {
-      const link = `https://calendar.google.com/event?eid=${encodeURIComponent(
-        dto.requestId,
-      )}`;
-
-      await new this.model({
-        ...base,
-        googleCalendarLink: link,
-      }).save();
+      // Update Mongo with Google link
+      if (googleCalendarLink) {
+        await this.meetingModel.updateOne(
+          { requestId },
+          { googleCalendarLink },
+        );
+      }
 
       return {
         status: 'created',
-        requestId: dto.requestId,
-        googleCalendarLink: link,
+        requestId,
+        googleCalendarLink,
+      };
+    } catch (error) {
+      console.error('n8n error:', error.message);
+      return {
+        status: 'created_without_calendar',
+        requestId,
       };
     }
-
-    throw new BadRequestException('Invalid decision value');
   }
 
   async getDecisionStatus(requestId: string) {
-    return this.model.findOne({ requestId }).lean().exec();
+    return this.meetingModel.findOne({ requestId }).lean();
   }
 }

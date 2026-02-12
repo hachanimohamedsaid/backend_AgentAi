@@ -1,8 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+export type MeetingDecisionDocument = MeetingDecision & Document;
+
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
-export class MeetingDecision extends Document {
+export class MeetingDecision {
   @Prop({ required: true })
   meetingDate: string;
 
@@ -15,7 +17,7 @@ export class MeetingDecision extends Document {
   @Prop({ required: true })
   durationMinutes: number;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: true })
   requestId: string;
 
   @Prop()
@@ -25,5 +27,6 @@ export class MeetingDecision extends Document {
   createdAt: Date;
 }
 
-export const MeetingDecisionSchema = SchemaFactory.createForClass(MeetingDecision);
-MeetingDecisionSchema.index({ requestId: 1 }, { unique: true });
+export const MeetingDecisionSchema =
+  SchemaFactory.createForClass(MeetingDecision);
+

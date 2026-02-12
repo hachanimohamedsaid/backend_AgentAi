@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
@@ -38,6 +39,7 @@ import { MeetingModule } from './meeting/meeting.module';
     UsersModule,
     AiModule,
     RealtimeModule,
+    HttpModule,
     MeetingModule,
   ],
   controllers: [AppController],

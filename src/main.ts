@@ -21,15 +21,28 @@ async function bootstrap() {
 
   const allowedOrigins = [
     'http://localhost:3000',
-    'http://localhost:59379',
-    'http://localhost:54699',
+    'http://localhost:51178',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:51178',
   ];
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile or server-to-server)
+      // Allow requests with no origin (curl, mobile apps, etc.)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+
+      // Allow any localhost / 127.0.0.1 origin in development
+      if (
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1')
+      ) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
       return callback(new Error('CORS policy: Origin not allowed'), false);
     },
     credentials: true,

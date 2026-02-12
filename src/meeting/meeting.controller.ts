@@ -9,7 +9,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { MeetingService, DecisionResponse } from './meeting.service';
+import { MeetingService } from './meeting.service';
 import { MeetingDecisionDto } from './dto/decision.dto';
 
 @Controller('meeting')
@@ -22,7 +22,7 @@ export class MeetingController {
   @HttpCode(HttpStatus.OK)
   async decision(
     @Body() dto: MeetingDecisionDto,
-  ): Promise<DecisionResponse> {
+  ): Promise<any> {
     this.logger.log(
       `Received meeting decision request: ${JSON.stringify(dto)}`,
     );
