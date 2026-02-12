@@ -28,4 +28,9 @@ export class ProjectDecisionsService {
     });
     return doc.save();
   }
+
+  /** Pour que Flutter récupère les décisions au chargement (ordre anti-chronologique). */
+  async findAll(): Promise<ProjectDecisionDocument[]> {
+    return this.projectDecisionModel.find().sort({ createdAt: -1 }).exec();
+  }
 }
