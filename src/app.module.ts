@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { AiModule } from './ai/ai.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { ProjectDecisionsModule } from './project-decisions/project-decisions.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     UsersModule,
     AiModule,
     RealtimeModule,
+    ProjectDecisionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
