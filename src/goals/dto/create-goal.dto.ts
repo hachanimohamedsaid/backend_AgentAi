@@ -8,22 +8,25 @@ import {
 import { Type } from 'class-transformer';
 
 class DailyActionDto {
+  @IsOptional()
   @IsString()
-  id: string;
+  id?: string;
 
   @IsString()
   label: string;
 
+  @IsOptional()
   @IsBoolean()
-  completed: boolean;
+  completed?: boolean;
 }
 
 export class CreateGoalDto {
   @IsString()
   title: string;
 
+  @IsOptional()
   @IsString()
-  category: string;
+  category?: string;
 
   @IsOptional()
   @IsString()

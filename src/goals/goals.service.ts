@@ -57,18 +57,21 @@ export class GoalsService {
   }
 
   async create(userId: string, dto: CreateGoalDto) {
+    const title = (dto.title ?? '').trim() || 'New goal';
+    const category = dto.category?.trim() || 'Personal';
+    const dailyActions = (dto.dailyActions ?? []).map((a, i) => ({
+      id: a.id?.trim() || `action_${Date.now()}_${i}`,
+      label: (a.label ?? '').trim() || `Action ${i + 1}`,
+      completed: a.completed ?? false,
+    }));
     const doc = new this.goalModel({
       userId,
-      title: dto.title,
-      category: dto.category,
-      deadline: dto.deadline ?? 'Ongoing',
+      title,
+      category,
+      deadline: dto.deadline?.trim() || 'Ongoing',
       progress: 0,
       streak: 0,
-      dailyActions: (dto.dailyActions ?? []).map((a) => ({
-        id: a.id,
-        label: a.label,
-        completed: a.completed ?? false,
-      })),
+      dailyActions,
     });
     const saved = await doc.save();
     return this.toGoalResponse(saved);
