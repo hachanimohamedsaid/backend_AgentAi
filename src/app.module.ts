@@ -9,6 +9,7 @@ import { AiModule } from './ai/ai.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ProjectDecisionsModule } from './project-decisions/project-decisions.module';
 import { ProjectAnalysesModule } from './project-analyses/project-analyses.module';
+import { GoalsModule } from './goals/goals.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ProjectAnalysesModule } from './project-analyses/project-analyses.modul
     RealtimeModule,
     ProjectDecisionsModule,
     ProjectAnalysesModule,
+    GoalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
