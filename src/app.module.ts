@@ -10,6 +10,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { ProjectDecisionsModule } from './project-decisions/project-decisions.module';
 import { ProjectAnalysesModule } from './project-analyses/project-analyses.module';
 import { GoalsModule } from './goals/goals.module';
+import { AdvisorModule } from './advisor/advisor.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { GoalsModule } from './goals/goals.module';
     ProjectDecisionsModule,
     ProjectAnalysesModule,
     GoalsModule,
+    AdvisorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
