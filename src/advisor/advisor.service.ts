@@ -74,12 +74,19 @@ export class AdvisorService {
     return { report };
   }
 
+  /**
+   * Historique des analyses.
+   * - Si userId présent : analyses de l'utilisateur OU sans userId (anciennes simulations).
+   * - Si pas de JWT : toutes les analyses (filter vide).
+   */
   async getHistory(
     userId?: string,
   ): Promise<
     { id: string; project_text: string; report: string; createdAt: Date }[]
   > {
-    const filter = userId ? { userId } : {};
+    const filter = userId
+      ? { $or: [{ userId }, { userId: null }, { userId: { $exists: false } }] }
+      : {};
     const docs = await this.analysisModel
       .find(filter)
       .sort({ createdAt: -1 })
