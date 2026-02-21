@@ -8,7 +8,7 @@ SendGrid est utilisé dans ce backend pour envoyer l’email de **réinitialisat
 
 1. Va sur **[https://sendgrid.com](https://sendgrid.com)**.
 2. Clique sur **Sign Up** et crée un compte (gratuit jusqu’à un certain volume d’emails/mois).
-3. Valide ton email si demandé.
+3. Valide ton email si demandé. test
 
 ---
 
