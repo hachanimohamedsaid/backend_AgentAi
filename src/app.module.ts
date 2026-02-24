@@ -11,6 +11,7 @@ import { ProjectDecisionsModule } from './project-decisions/project-decisions.mo
 import { ProjectAnalysesModule } from './project-analyses/project-analyses.module';
 import { GoalsModule } from './goals/goals.module';
 import { AdvisorModule } from './advisor/advisor.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { AdvisorModule } from './advisor/advisor.module';
     ProjectAnalysesModule,
     GoalsModule,
     AdvisorModule,
+    AssistantModule,
   ],
   controllers: [AppController],
   providers: [AppService],
