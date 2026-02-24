@@ -1,12 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
 @Injectable()
 export class MlService {
   private readonly logger = new Logger(MlService.name);
-  // Use IPv4 by default to avoid ::1 issues; override with ML_PREDICT_URL if needed
-  private readonly endpoint =
-    process.env.ML_PREDICT_URL ?? 'http://127.0.0.1:5001/predict';
+
+  constructor(private readonly configService: ConfigService) {}
+
+  private get endpoint(): string {
+    const url =
+      this.configService.get<string>('ML_SERVICE_URL') ||
+      process.env.ML_SERVICE_URL;
+    if (url) return url.replace(/\/?$/, '') + '/predict';
+    return 'http://127.0.0.1:5001/predict';
+  }
 
   async predict(params: {
     timeOfDay: number;

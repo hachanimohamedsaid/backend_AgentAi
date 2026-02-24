@@ -17,7 +17,13 @@ class PredictResponse(BaseModel):
     probability: float
 
 
-MONGO_URI = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI") or "mongodb://localhost:27017/agentai"
+# MongoDB hébergé (Atlas, etc.) : toujours via variable d'environnement, pas de localhost en dur.
+MONGO_URI = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")
+if not MONGO_URI:
+    raise RuntimeError(
+        "MONGO_URI or MONGODB_URI must be set. Use a hosted MongoDB (e.g. Atlas) and set the "
+        "variable in .env (local) or in your deployment environment (e.g. Railway)."
+    )
 client = MongoClient(MONGO_URI)
 db = client.get_default_database()
 logs = db.get_collection("interaction_logs")
