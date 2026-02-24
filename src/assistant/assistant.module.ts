@@ -14,6 +14,11 @@ import {
   Habit,
   HabitSchema,
 } from './schemas/habit.schema';
+import {
+  InteractionLog,
+  InteractionLogSchema,
+} from './schemas/interaction-log.schema';
+import { MlService } from './ml.service';
 
 @Module({
   imports: [
@@ -21,10 +26,10 @@ import {
       { name: Context.name, schema: ContextSchema },
       { name: Suggestion.name, schema: SuggestionSchema },
       { name: Habit.name, schema: HabitSchema },
+      { name: InteractionLog.name, schema: InteractionLogSchema },
     ]),
   ],
   controllers: [AssistantController],
-  providers: [AssistantService],
+  providers: [AssistantService, MlService],
 })
 export class AssistantModule {}
-

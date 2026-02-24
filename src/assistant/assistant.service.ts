@@ -15,7 +15,12 @@ import {
   Habit,
   HabitDocument,
 } from './schemas/habit.schema';
+import {
+  InteractionLog,
+  InteractionLogDocument,
+} from './schemas/interaction-log.schema';
 import { CreateContextDto } from './dto/create-context.dto';
+import { MlService } from './ml.service';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -34,6 +39,9 @@ export class AssistantService {
     private readonly suggestionModel: Model<SuggestionDocument>,
     @InjectModel(Habit.name)
     private readonly habitModel: Model<HabitDocument>,
+    @InjectModel(InteractionLog.name)
+    private readonly interactionLogModel: Model<InteractionLogDocument>,
+    private readonly mlService: MlService,
   ) {}
 
   async saveContextAndGenerateSuggestions(
@@ -96,13 +104,25 @@ export class AssistantService {
     return hours * 60 + minutes;
   }
 
-  private async generateSuggestions(
+  private hasUpcomingMeeting(
+    context: ContextDocument,
+    nowMinutes: number,
+  ): boolean {
+    const next45 = nowMinutes + 45;
+    return (
+      (context.meetings ?? []).some((m) => {
+        const mt = this.getMinutes(m.time);
+        return mt !== null && mt >= nowMinutes && mt <= next45;
+      }) ?? false
+    );
+  }
+
+  private async generateRuleBasedSuggestions(
     context: ContextDocument,
   ): Promise<GeneratedSuggestion[]> {
     const suggestions: GeneratedSuggestion[] = [];
     const nowMinutes = this.getMinutes(context.time) ?? 0;
 
-    // Coffee: 08:00–09:30 at home
     const eight = 8 * 60;
     const nineThirty = 9 * 60 + 30;
     if (
@@ -117,13 +137,7 @@ export class AssistantService {
       });
     }
 
-    // Leave home: meeting within 45 minutes
-    const next45 = nowMinutes + 45;
-    const hasUpcomingMeeting =
-      (context.meetings ?? []).some((m) => {
-        const mt = this.getMinutes(m.time);
-        return mt !== null && mt >= nowMinutes && mt <= next45;
-      }) ?? false;
+    const hasUpcomingMeeting = this.hasUpcomingMeeting(context, nowMinutes);
     if (hasUpcomingMeeting) {
       suggestions.push({
         type: 'leave_home',
@@ -132,7 +146,6 @@ export class AssistantService {
       });
     }
 
-    // Umbrella: rain
     if (context.weather === 'rain') {
       suggestions.push({
         type: 'umbrella',
@@ -141,7 +154,6 @@ export class AssistantService {
       });
     }
 
-    // Break: focusHours >= 2
     if (context.focusHours >= 2) {
       suggestions.push({
         type: 'break',
@@ -150,7 +162,6 @@ export class AssistantService {
       });
     }
 
-    // Apply habit-based adjustment and sort
     const withHabits: GeneratedSuggestion[] = [];
     for (const s of suggestions) {
       const habit = await this.getHabit(context.userId, s.type);
@@ -160,6 +171,70 @@ export class AssistantService {
 
     withHabits.sort((a, b) => b.baseConfidence - a.baseConfidence);
     return withHabits;
+  }
+
+  private async generateSuggestions(
+    context: ContextDocument,
+  ): Promise<GeneratedSuggestion[]> {
+    const nowMinutes = this.getMinutes(context.time) ?? 0;
+    const timeOfDay = Math.floor(nowMinutes / 60);
+    const dayOfWeek = new Date().getDay();
+
+    const candidates: { type: SuggestionType; message: string }[] = [];
+
+    if (context.location === 'home') {
+      candidates.push({
+        type: 'coffee',
+        message: 'Want your usual coffee?',
+      });
+    }
+
+    if (this.hasUpcomingMeeting(context, nowMinutes)) {
+      candidates.push({
+        type: 'leave_home',
+        message: 'You should leave now to arrive on time.',
+      });
+    }
+
+    if (context.weather === 'rain') {
+      candidates.push({
+        type: 'umbrella',
+        message: 'Rain is expected. Bring an umbrella.',
+      });
+    }
+
+    if (context.focusHours >= 2) {
+      candidates.push({
+        type: 'break',
+        message: `You've been focused for ${context.focusHours} hours. Take a break.`,
+      });
+    }
+
+    if (!candidates.length) {
+      return [];
+    }
+
+    try {
+      const results: GeneratedSuggestion[] = [];
+      for (const c of candidates) {
+        const probability = await this.mlService.predict({
+          timeOfDay,
+          dayOfWeek,
+          suggestionType: c.type,
+        });
+        if (probability > 0.6) {
+          results.push({
+            type: c.type,
+            message: c.message,
+            baseConfidence: probability, // confidence = probability
+          });
+        }
+      }
+      return results;
+    } catch {
+      // Safety fallback to rule-based engine
+      return this.generateRuleBasedSuggestions(context);
+    }
   }
 
   async getTodayPendingSuggestions(
@@ -202,6 +277,15 @@ export class AssistantService {
       suggestion.type,
       action === 'accepted',
     );
+
+    const now = new Date();
+    await this.interactionLogModel.create({
+      userId: suggestion.userId,
+      suggestionType: suggestion.type,
+      action,
+      timeOfDay: now.getHours(),
+      dayOfWeek: now.getDay(),
+    });
   }
 
   private async updateHabit(
