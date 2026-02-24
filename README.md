@@ -64,6 +64,76 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Vérifier que tout fonctionne
+
+### 1. Variables d'environnement
+
+```bash
+cp .env.example .env
+# Éditer .env : MONGO_URI (obligatoire), optionnellement ML_SERVICE_URL, JWT_SECRET, etc.
+```
+
+Vérifier que les variables requises sont définies :
+
+```bash
+npm run verify:env
+```
+
+### 2. Service ML (FastAPI)
+
+Le service ML exige `MONGO_URI` ou `MONGODB_URI` (MongoDB hébergé, ex. Atlas).
+
+```bash
+cd ml_service
+export MONGO_URI="mongodb+srv://..."   # ou depuis .env à la racine
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 5001
+```
+
+Dans un autre terminal, tester l’API de prédiction :
+
+```bash
+curl -s -X POST http://127.0.0.1:5001/predict \
+  -H "Content-Type: application/json" \
+  -d '{"timeOfDay":10,"dayOfWeek":1,"suggestionType":"coffee"}' \
+  | jq .
+# Attendu : {"probability": 0.5} (ou une valeur entre 0.1 et 0.9)
+```
+
+Ou utiliser le script :
+
+```bash
+npm run verify:ml
+```
+
+### 3. Backend Nest
+
+```bash
+npm run start:dev
+```
+
+Vérifier dans les logs : `[Mongoose] Successfully connected to MongoDB Atlas.` et `Nest application successfully started`.
+
+Tester l’API :
+
+```bash
+curl -s http://localhost:3000/
+# Attendu : Hello World!
+```
+
+### 4. Intégration Backend → ML
+
+Si `ML_SERVICE_URL` est défini (ou en local si le service ML tourne sur le port 5001), les endpoints qui utilisent les prédictions ML fonctionnent. Sinon, les appels ML échouent (vérifier les logs Nest).
+
+### 5. Résumé des commandes de vérification
+
+| Commande        | Rôle                                      |
+|-----------------|--------------------------------------------|
+| `npm run verify:env` | Vérifie que MONGO_URI est défini          |
+| `npm run verify:ml` | Teste POST /predict sur le service ML (port 5001) |
+| `npm run test`      | Tests unitaires Nest                      |
+| `npm run test:e2e`  | Tests e2e (nécessite MONGO_URI dans .env) |
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

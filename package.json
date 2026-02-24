@@ -17,7 +17,9 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "verify:env": "node -e \"const fs=require('fs'); if(!fs.existsSync('.env')){ console.error('ERREUR: fichier .env absent. Copiez .env.example vers .env.'); process.exit(1); } const env=fs.readFileSync('.env','utf8'); const ok=env.split(/\\\\n/).some(l=>{const t=l.trim(); return (t.startsWith('MONGO_URI=')&&t.length>10)||(t.startsWith('MONGODB_URI=')&&t.length>12);}); if(!ok){ console.error('ERREUR: MONGO_URI ou MONGODB_URI non défini dans .env (ou valeur vide).'); process.exit(1); } console.log('OK: variables MongoDB présentes dans .env');\"",
+    "verify:ml": "curl -sf -X POST http://127.0.0.1:5001/predict -H 'Content-Type: application/json' -d '{\"timeOfDay\":10,\"dayOfWeek\":1,\"suggestionType\":\"coffee\"}' || (echo 'Le service ML ne répond pas sur le port 5001. Lancez-le avec: cd ml_service && uvicorn main:app --port 5001' && exit 1)"
   },
   "dependencies": {
     "@nestjs/axios": "^4.0.1",
