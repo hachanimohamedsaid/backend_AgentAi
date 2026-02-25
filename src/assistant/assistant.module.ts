@@ -19,6 +19,11 @@ import {
   InteractionLog,
   InteractionLogSchema,
 } from './schemas/interaction-log.schema';
+import {
+  TrainingSample,
+  TrainingSampleSchema,
+} from './schemas/training-sample.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 import { MlService } from './ml.service';
 
 @Module({
@@ -29,6 +34,8 @@ import { MlService } from './ml.service';
       { name: Suggestion.name, schema: SuggestionSchema },
       { name: Habit.name, schema: HabitSchema },
       { name: InteractionLog.name, schema: InteractionLogSchema },
+      { name: TrainingSample.name, schema: TrainingSampleSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [AssistantController],

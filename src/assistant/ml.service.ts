@@ -30,17 +30,24 @@ export class MlService {
     private readonly configService: ConfigService,
   ) {}
 
-  private getPredictEndpoint(): string {
+  private getBaseUrl(): string {
     const url =
       this.configService.get<string>('ML_SERVICE_URL') ||
       process.env.ML_SERVICE_URL;
     if (url) {
-      const base = url.replace(/\/predict\/?$/i, '').replace(/\/?$/, '');
-      return `${base}/predict`;
+      return url.replace(/\/predict\/?$/i, '').replace(/\/retrain\/?.*$/i, '').replace(/\/?$/, '');
     }
     return process.env.NODE_ENV === 'production'
-      ? 'https://incredible-determination-production-a7c3.up.railway.app/predict'
-      : 'http://127.0.0.1:8000/predict';
+      ? 'https://incredible-determination-production-a7c3.up.railway.app'
+      : 'http://127.0.0.1:8000';
+  }
+
+  private getPredictEndpoint(): string {
+    return `${this.getBaseUrl()}/predict`;
+  }
+
+  private getRetrainEndpoint(userId: string): string {
+    return `${this.getBaseUrl()}/retrain/${encodeURIComponent(userId)}`;
   }
 
   async predict(
@@ -79,6 +86,35 @@ export class MlService {
       throw new Error(
         `ML service unavailable: ${typeof message === 'string' ? message : 'request failed'}`,
       );
+    }
+  }
+
+  /**
+   * Call ML service POST /retrain/:userId. Returns { trained: boolean } or null on error.
+   */
+  async retrain(userId: string): Promise<{ trained: boolean } | null> {
+    const endpoint = this.getRetrainEndpoint(userId);
+    try {
+      const response = await firstValueFrom(
+        this.httpService.post<{ user_id: string; trained: boolean }>(
+          endpoint,
+          {},
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 15000,
+          },
+        ),
+      );
+      return {
+        trained: response.data?.trained ?? false,
+      };
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.detail ??
+        err?.message ??
+        'ML retrain failed';
+      this.logger.warn(`ML retrain error: ${message}`);
+      return null;
     }
   }
 }

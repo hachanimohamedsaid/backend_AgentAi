@@ -59,6 +59,12 @@ export class User {
   @Prop({ type: Date, default: null })
   emailVerificationExpires: Date | null;
 
+  @Prop({ type: Boolean, default: false })
+  mlTrained: boolean;
+
+  @Prop({ type: Date, default: null })
+  lastTrainingAt: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

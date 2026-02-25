@@ -32,6 +32,19 @@ export class Suggestion {
   })
   status: SuggestionStatus;
 
+  /** Context snapshot for training (set when suggestion is created) */
+  @Prop({ type: String, default: null })
+  time: string | null;
+
+  @Prop({ type: String, default: null })
+  location: string | null;
+
+  @Prop({ type: String, default: null })
+  weather: string | null;
+
+  @Prop({ type: Number, default: null })
+  focusHours: number | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

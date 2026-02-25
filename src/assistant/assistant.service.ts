@@ -19,6 +19,11 @@ import {
   InteractionLog,
   InteractionLogDocument,
 } from './schemas/interaction-log.schema';
+import {
+  TrainingSample,
+  TrainingSampleDocument,
+} from './schemas/training-sample.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateContextDto } from './dto/create-context.dto';
 import { MlService } from './ml.service';
 
@@ -27,6 +32,9 @@ interface GeneratedSuggestion {
   message: string;
   baseConfidence: number;
 }
+
+const ACCEPTED_THRESHOLD = 30;
+const RETRAIN_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 
 @Injectable()
 export class AssistantService {
@@ -41,6 +49,10 @@ export class AssistantService {
     private readonly habitModel: Model<HabitDocument>,
     @InjectModel(InteractionLog.name)
     private readonly interactionLogModel: Model<InteractionLogDocument>,
+    @InjectModel(TrainingSample.name)
+    private readonly trainingSampleModel: Model<TrainingSampleDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
     private readonly mlService: MlService,
   ) {}
 
@@ -59,40 +71,88 @@ export class AssistantService {
   }
 
   /**
-   * Calls ML service /predict with context, then stores each suggestion in MongoDB
-   * with userId, message, confidence, status pending.
+   * If user.mlTrained → call ML /predict. Otherwise use rule-based suggestions.
+   * Stores suggestions with context snapshot (time, location, weather, focusHours) for training.
    */
   async generateSuggestionsFromContextDto(
     dto: CreateContextDto,
   ): Promise<SuggestionDocument[]> {
-    const suggestions = await this.mlService.predict({
+    const user = await this.userModel.findOne({ userId: dto.userId }).exec();
+    const contextLike = {
       userId: dto.userId,
       time: dto.time,
       location: dto.location,
       weather: dto.weather,
+      meetings: dto.meetings ?? [],
       focusHours: dto.focusHours,
-      meetings: Array.isArray(dto.meetings) ? dto.meetings.length : 0,
-    });
+    } as ContextDocument;
 
-    if (!suggestions.length) {
+    const contextFields = {
+      time: dto.time,
+      location: dto.location,
+      weather: dto.weather,
+      focusHours: dto.focusHours,
+    };
+
+    if (user?.mlTrained) {
+      const suggestions = await this.mlService.predict({
+        userId: dto.userId,
+        time: dto.time,
+        location: dto.location,
+        weather: dto.weather,
+        focusHours: dto.focusHours,
+        meetings: Array.isArray(dto.meetings) ? dto.meetings.length : 0,
+      });
+
+      if (!suggestions.length) {
+        const fallback = new this.suggestionModel({
+          userId: dto.userId,
+          type: 'break',
+          message: 'Stay hydrated and take a short break when you can.',
+          confidence: 0.5,
+          status: 'pending' as SuggestionStatus,
+          ...contextFields,
+        });
+        await fallback.save();
+        return [fallback];
+      }
+
+      const docs = await this.suggestionModel.insertMany(
+        suggestions.map((s) => ({
+          userId: dto.userId,
+          type: 'break' as SuggestionType,
+          message: s.message,
+          confidence: Math.min(1, Math.max(0, s.confidence)),
+          status: 'pending' as SuggestionStatus,
+          ...contextFields,
+        })),
+      );
+      return docs;
+    }
+
+    // Fallback: rule-based suggestions when ML not trained for this user
+    const generated = await this.generateRuleBasedSuggestions(contextLike);
+    if (!generated.length) {
       const fallback = new this.suggestionModel({
         userId: dto.userId,
         type: 'break',
         message: 'Stay hydrated and take a short break when you can.',
         confidence: 0.5,
         status: 'pending' as SuggestionStatus,
+        ...contextFields,
       });
       await fallback.save();
       return [fallback];
     }
 
     const docs = await this.suggestionModel.insertMany(
-      suggestions.map((s) => ({
+      generated.map((s) => ({
         userId: dto.userId,
-        type: 'break' as SuggestionType,
+        type: s.type,
         message: s.message,
-        confidence: Math.min(1, Math.max(0, s.confidence)),
+        confidence: s.baseConfidence,
         status: 'pending' as SuggestionStatus,
+        ...contextFields,
       })),
     );
     return docs;
@@ -236,7 +296,6 @@ export class AssistantService {
     }
 
     if (suggestion.status !== 'pending') {
-      // Already processed; no-op
       return;
     }
 
@@ -257,6 +316,72 @@ export class AssistantService {
       timeOfDay: now.getHours(),
       dayOfWeek: now.getDay(),
     });
+
+    // Store training sample when we have context snapshot on the suggestion
+    const hasContext =
+      suggestion.time != null &&
+      suggestion.location != null &&
+      suggestion.weather != null &&
+      suggestion.focusHours != null;
+
+    if (hasContext) {
+      await this.trainingSampleModel.create({
+        userId: suggestion.userId,
+        time: suggestion.time!,
+        location: suggestion.location!,
+        weather: suggestion.weather!,
+        focusHours: suggestion.focusHours!,
+        suggestionType: suggestion.type,
+        accepted: action === 'accepted',
+      });
+
+      await this.maybeTriggerRetrain(suggestion.userId, now);
+    }
+  }
+
+  /**
+   * If user has >= ACCEPTED_THRESHOLD accepted samples and (mlTrained is false and lastTrainingAt allows),
+   * call ML retrain and set user.mlTrained = true, user.lastTrainingAt = now.
+   */
+  private async maybeTriggerRetrain(
+    userId: string,
+    now: Date,
+  ): Promise<void> {
+    const acceptedCount = await this.trainingSampleModel
+      .countDocuments({ userId, accepted: true })
+      .exec();
+
+    if (acceptedCount < ACCEPTED_THRESHOLD) {
+      return;
+    }
+
+    const user = await this.userModel.findOne({ userId }).exec();
+    if (!user) {
+      return;
+    }
+    if (user.mlTrained) {
+      return;
+    }
+    if (
+      user.lastTrainingAt != null &&
+      now.getTime() - user.lastTrainingAt.getTime() < RETRAIN_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    try {
+      const result = await this.mlService.retrain(userId);
+      if (result?.trained) {
+        await this.userModel
+          .updateOne(
+            { userId },
+            { $set: { mlTrained: true, lastTrainingAt: now } },
+          )
+          .exec();
+      }
+    } catch {
+      // Avoid crashing feedback; retrain can be retried later
+    }
   }
 
   private async updateHabit(
