@@ -42,18 +42,19 @@ class SpendingPredictor:
 
     # ── n8n fetch ─────────────────────────────────────────────────────────────
 
-    def _fetch_history(self) -> List[Dict[str, Any]]:
-        """Call n8n webhook (POST) and return list of {month, category, total} rows."""
+    def _fetch_n8n(self) -> Dict[str, Any]:
+        """POST to n8n ml-predict webhook and return the raw JSON response."""
         with httpx.Client(timeout=15) as client:
             resp = client.post(N8N_WEBHOOK, json={})
             resp.raise_for_status()
+        return resp.json() if isinstance(resp.json(), dict) else {"data": resp.json()}
 
-        raw = resp.json()
-        rows: List[Dict[str, Any]] = (
-            raw if isinstance(raw, list)
-            else raw.get("history") or raw.get("data") or []
-        )
-
+    def _parse_history_rows(self, raw: Any) -> List[Dict[str, Any]]:
+        """
+        Parse flat list of transaction rows: [{month, category, total}, ...].
+        Used when n8n returns raw rows and Python does the regression.
+        """
+        rows: List[Dict[str, Any]] = raw if isinstance(raw, list) else []
         result = []
         for r in rows:
             try:
@@ -65,6 +66,28 @@ class SpendingPredictor:
             except (KeyError, ValueError, TypeError):
                 continue
         return result
+
+    def _parse_by_category(self, by_category: Dict[str, Any]) -> List[CategoryPrediction]:
+        """
+        Parse n8n pre-computed predictions: {category: predicted_amount, ...}.
+        Used when n8n already ran its own regression Code node.
+        """
+        predictions = []
+        for category, value in by_category.items():
+            try:
+                predicted = round(float(value), 2)
+            except (ValueError, TypeError):
+                continue
+            budget = round(predicted * 1.05, 2)
+            predictions.append(CategoryPrediction(
+                category=category,
+                predicted=predicted,
+                budget=budget,
+                over_budget=predicted > budget,
+                trend="stable",
+                history=[predicted],
+            ))
+        return predictions
 
     # ── Linear regression ─────────────────────────────────────────────────────
 
@@ -104,42 +127,46 @@ class SpendingPredictor:
     # ── Compute ───────────────────────────────────────────────────────────────
 
     def _compute_and_cache(self) -> SpendingPredictionResponse:
-        history = self._fetch_history()
+        n8n_response = self._fetch_n8n()
 
-        # Group by category → sorted list of monthly totals
-        by_category: Dict[str, List[dict]] = {}
-        for row in history:
-            cat = row["category"]
-            by_category.setdefault(cat, []).append(row)
+        # n8n may return pre-computed by_category OR raw transaction rows
+        n8n_by_category = n8n_response.get("by_category") or {}
+        n8n_raw_rows = (
+            n8n_response.get("data")
+            or n8n_response.get("history")
+            or (n8n_response if isinstance(n8n_response, list) else [])
+        )
 
         predictions: List[CategoryPrediction] = []
-        for category, rows in by_category.items():
-            rows.sort(key=lambda r: r["month"])
-            values = [r["total"] for r in rows]
 
-            predicted = self._predict_next(values)
+        if n8n_by_category and isinstance(n8n_by_category, dict):
+            # n8n Code node already ran the regression → use its output
+            predictions = self._parse_by_category(n8n_by_category)
 
-            # Budget = average of last 3 months × 1.05 (5 % tolerance)
-            recent = values[-3:] if len(values) >= 3 else values
-            avg_recent = float(np.mean(recent))
-            budget = round(avg_recent * 1.05, 2)
+        elif n8n_raw_rows:
+            # n8n returned raw rows → Python runs scikit-learn regression
+            history = self._parse_history_rows(n8n_raw_rows)
+            grouped: Dict[str, List[dict]] = {}
+            for row in history:
+                grouped.setdefault(row["category"], []).append(row)
 
-            last = values[-1] if values else 0.0
-            if predicted > last * 1.02:
-                trend = "up"
-            elif predicted < last * 0.98:
-                trend = "down"
-            else:
-                trend = "stable"
-
-            predictions.append(CategoryPrediction(
-                category=category,
-                predicted=predicted,
-                budget=budget,
-                over_budget=predicted > budget,
-                trend=trend,
-                history=values,
-            ))
+            for category, rows in grouped.items():
+                rows.sort(key=lambda r: r["month"])
+                values = [r["total"] for r in rows]
+                predicted = self._predict_next(values)
+                recent = values[-3:] if len(values) >= 3 else values
+                avg_recent = float(np.mean(recent))
+                budget = round(avg_recent * 1.05, 2)
+                last = values[-1] if values else 0.0
+                trend = "up" if predicted > last * 1.02 else "down" if predicted < last * 0.98 else "stable"
+                predictions.append(CategoryPrediction(
+                    category=category,
+                    predicted=predicted,
+                    budget=budget,
+                    over_budget=predicted > budget,
+                    trend=trend,
+                    history=values,
+                ))
 
         next_month = self._next_month_key()
         next_month_label = self._month_key_to_label(next_month)
