@@ -8,17 +8,19 @@ export class MlService {
   constructor(private readonly configService: ConfigService) {}
 
   private getPythonServiceUrl(): string {
-    // Set SPENDING_ML_URL in Railway env vars once the Python service is deployed
+    // ML_SERVICE_URL = the Railway URL of the merged ml_service (assistant + spending)
+    // Same env var as the assistant already uses; both routes live on the same service now
     return (
+      this.configService.get<string>('ML_SERVICE_URL') ||
       this.configService.get<string>('SPENDING_ML_URL') ||
-      process.env.SPENDING_ML_URL ||
-      'http://localhost:8081'
+      process.env.ML_SERVICE_URL ||
+      'http://localhost:8080'
     );
   }
 
   /**
-   * Delegates to the Python FastAPI spending ML service.
-   * The Python service runs linear regression (scikit-learn) over 6-month
+   * Calls GET /spending-prediction on the unified Python ML service.
+   * The Python service runs scikit-learn linear regression over 6-month
    * Google Sheets history (via n8n) and caches results in MongoDB for 24 h.
    */
   async getSpendingPrediction(): Promise<object> {

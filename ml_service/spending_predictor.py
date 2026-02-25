@@ -8,8 +8,8 @@ import httpx
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from database import Database
-from schemas import CategoryPrediction, SpendingPredictionResponse
+from spending_database import Database
+from spending_schemas import CategoryPrediction, SpendingPredictionResponse
 
 N8N_WEBHOOK = "https://n8n-production-1e13.up.railway.app/webhook/ml-predict"
 
