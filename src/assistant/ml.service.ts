@@ -78,14 +78,19 @@ export class MlService {
       }
       return suggestions;
     } catch (err: any) {
-      const message =
-        err?.response?.data?.detail ||
-        err?.message ||
+      const raw =
+        err?.response?.data?.detail ??
+        err?.response?.data ??
+        err?.message ??
         'ML prediction service unreachable';
+      const message =
+        typeof raw === 'string'
+          ? raw
+          : typeof raw === 'object'
+            ? JSON.stringify(raw)
+            : String(raw);
       this.logger.error(`ML predict error: ${message}`);
-      throw new Error(
-        `ML service unavailable: ${typeof message === 'string' ? message : 'request failed'}`,
-      );
+      throw new Error(`ML service unavailable: ${message}`);
     }
   }
 
@@ -109,10 +114,17 @@ export class MlService {
         trained: response.data?.trained ?? false,
       };
     } catch (err: any) {
-      const message =
+      const raw =
         err?.response?.data?.detail ??
+        err?.response?.data ??
         err?.message ??
         'ML retrain failed';
+      const message =
+        typeof raw === 'string'
+          ? raw
+          : typeof raw === 'object'
+            ? JSON.stringify(raw)
+            : String(raw);
       this.logger.warn(`ML retrain error: ${message}`);
       return null;
     }

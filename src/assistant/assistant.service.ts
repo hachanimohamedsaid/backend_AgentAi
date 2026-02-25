@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -288,6 +292,15 @@ export class AssistantService {
     suggestionId: string,
     action: 'accepted' | 'dismissed',
   ): Promise<void> {
+    if (
+      !suggestionId ||
+      typeof suggestionId !== 'string' ||
+      !/^[a-fA-F0-9]{24}$/.test(suggestionId)
+    ) {
+      throw new BadRequestException(
+        'Invalid suggestion ID. Must be a 24-character hex string (MongoDB ObjectId).',
+      );
+    }
     const suggestion = await this.suggestionModel
       .findById(suggestionId)
       .exec();
