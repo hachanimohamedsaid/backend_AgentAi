@@ -66,6 +66,8 @@ $ npm run test:cov
 
 ## Vérifier que tout fonctionne
 
+**Méthode de test complète :** voir [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) pour la procédure détaillée (local + prod + checklist).
+
 ### 1. Variables d'environnement
 
 ```bash
@@ -130,9 +132,11 @@ Si `ML_SERVICE_URL` est défini (ou en local si le service ML tourne sur le port
 | Commande        | Rôle                                      |
 |-----------------|--------------------------------------------|
 | `npm run verify:env` | Vérifie que MONGO_URI est défini          |
-| `npm run verify:ml` | Teste POST /predict sur le service ML (port 5001) |
-| `npm run test`      | Tests unitaires Nest                      |
-| `npm run test:e2e`  | Tests e2e (nécessite MONGO_URI dans .env) |
+| `npm run verify:ml`      | Teste POST /predict sur le service ML (port 5001) |
+| `npm run verify:backend` | Teste GET / sur le backend Nest (port 3000)      |
+| `npm run verify:all`     | Enchaîne verify:env, verify:ml, verify:backend (ML et Nest doivent être lancés) |
+| `npm run test`           | Tests unitaires Nest                              |
+| `npm run test:e2e`       | Tests e2e (nécessite MONGO_URI dans .env)         |
 
 ## Deployment
 

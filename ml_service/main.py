@@ -31,6 +31,11 @@ logs = db.get_collection("interaction_logs")
 app = FastAPI(title="Assistant ML Service", version="1.0.0")
 
 
+@app.get("/")
+def root():
+    return {"service": "Assistant ML Service", "predict": "POST /predict"}
+
+
 def compute_probability(
     user_id: Optional[str],
     suggestion_type: str,
