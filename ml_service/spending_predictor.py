@@ -67,25 +67,65 @@ class SpendingPredictor:
                 continue
         return result
 
-    def _parse_by_category(self, by_category: Dict[str, Any]) -> List[CategoryPrediction]:
+    def _parse_by_category(
+        self,
+        by_category: Dict[str, Any],
+        historical_data: Optional[Dict[str, Any]] = None,
+    ) -> List[CategoryPrediction]:
         """
-        Parse n8n pre-computed predictions: {category: predicted_amount, ...}.
-        Used when n8n already ran its own regression Code node.
+        Parse n8n Code-node output:
+          by_category = {
+            "Food": {
+              "predicted_next_month": 432.5,
+              "trend": "increasing" | "decreasing" | "stable",
+              "average_monthly": 410.0,
+              "last_month_amount": 421.0,
+              ...
+            }, ...
+          }
+          historical_data = {
+            "Food": [{"month": "2025-09", "amount": 380}, ...], ...
+          }
         """
+        # n8n trend labels → our schema labels
+        trend_map = {"increasing": "up", "decreasing": "down", "stable": "stable"}
+
         predictions = []
-        for category, value in by_category.items():
+        for category, data in by_category.items():
             try:
-                predicted = round(float(value), 2)
+                if isinstance(data, dict):
+                    # Rich format from n8n Code node
+                    predicted = round(float(data.get("predicted_next_month", 0)), 2)
+                    raw_trend = data.get("trend", "stable")
+                    avg = float(data.get("average_monthly", predicted))
+                else:
+                    # Simple {category: number} fallback
+                    predicted = round(float(data), 2)
+                    raw_trend = "stable"
+                    avg = predicted
             except (ValueError, TypeError):
                 continue
-            budget = round(predicted * 1.05, 2)
+
+            trend = trend_map.get(raw_trend, "stable")
+            # Budget = average monthly × 1.05 (5 % tolerance)
+            budget = round(avg * 1.05, 2)
+
+            # Extract history array from historical_data if available
+            history: List[float] = []
+            if historical_data and category in historical_data:
+                for entry in historical_data[category]:
+                    try:
+                        history.append(float(entry.get("amount", 0)))
+                    except (ValueError, TypeError):
+                        pass
+
             predictions.append(CategoryPrediction(
                 category=category,
                 predicted=predicted,
                 budget=budget,
                 over_budget=predicted > budget,
-                trend="stable",
-                history=[predicted],
+                trend=trend,
+                history=history or [predicted],
             ))
         return predictions
 
@@ -141,7 +181,8 @@ class SpendingPredictor:
 
         if n8n_by_category and isinstance(n8n_by_category, dict):
             # n8n Code node already ran the regression → use its output
-            predictions = self._parse_by_category(n8n_by_category)
+            n8n_historical = n8n_response.get("historical_data") or {}
+            predictions = self._parse_by_category(n8n_by_category, n8n_historical)
 
         elif n8n_raw_rows:
             # n8n returned raw rows → Python runs scikit-learn regression
