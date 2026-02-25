@@ -12,6 +12,7 @@ import { ProjectAnalysesModule } from './project-analyses/project-analyses.modul
 import { GoalsModule } from './goals/goals.module';
 import { AdvisorModule } from './advisor/advisor.module';
 import { AssistantModule } from './assistant/assistant.module';
+import { MlModule } from './ml/ml.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { AssistantModule } from './assistant/assistant.module';
     GoalsModule,
     AdvisorModule,
     AssistantModule,
+    MlModule,
   ],
   controllers: [AppController],
   providers: [AppService],
