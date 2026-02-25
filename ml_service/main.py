@@ -4,14 +4,16 @@ from fastapi import FastAPI, HTTPException
 
 from database import Database
 from predictor import SuggestionEngine
+from repository import UserHistoryRepository
 from schemas import PredictRequest, PredictResponse
 
 
 MONGO_URI = os.getenv("MONGO_URI")
 db = Database(MONGO_URI)
+repo = UserHistoryRepository(MONGO_URI)
 
 app = FastAPI(title="Assistant ML Service", version="1.0.0")
-engine = SuggestionEngine(database=db)
+engine = SuggestionEngine(database=db, repository=repo)
 
 
 @app.get("/")
@@ -30,6 +32,16 @@ async def predict(body: PredictRequest) -> PredictResponse:
         context = body
         suggestions = engine.generate_suggestions(context)
         return PredictResponse(suggestions=suggestions)
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.post("/retrain/{user_id}")
+async def retrain(user_id: str) -> dict:
+    """Force rebuild the model for this user from MongoDB history."""
+    try:
+        ok = engine.retrain_user(user_id)
+        return {"user_id": user_id, "trained": ok}
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

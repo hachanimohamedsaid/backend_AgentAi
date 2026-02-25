@@ -66,6 +66,7 @@ export class AssistantService {
     dto: CreateContextDto,
   ): Promise<SuggestionDocument[]> {
     const suggestions = await this.mlService.predict({
+      userId: dto.userId,
       time: dto.time,
       location: dto.location,
       weather: dto.weather,

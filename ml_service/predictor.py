@@ -1,58 +1,27 @@
 from __future__ import annotations
 
-import os
-import pickle
 from dataclasses import dataclass
-from typing import List, Optional
-
-import numpy as np
+from typing import Dict, List, Optional, Any
 
 from database import Database
+from repository import UserHistoryRepository
 from schemas import Context, Suggestion
+from user_model import UserPreferenceModel, MIN_SAMPLES
+
+# In-memory cache: user_id -> fitted LogisticRegression model
+models_cache: Dict[str, Any] = {}
 
 
 @dataclass
 class SuggestionEngine:
     database: Optional[Database] = None
+    repository: Optional[UserHistoryRepository] = None
 
     def __post_init__(self) -> None:
-        self.model = None
-        model_path = os.getenv("ML_MODEL_PATH", "model.pkl")
-        if os.path.exists(model_path):
-            try:
-                with open(model_path, "rb") as f:
-                    self.model = pickle.load(f)
-            except Exception:
-                self.model = None
-
-    def _to_features(self, context: Context) -> np.ndarray:
-        hh, mm = context.time.split(":")
-        hour = int(hh)
-        minute = int(mm)
-
-        location_home = 1 if context.location == "home" else 0
-        location_outside = 1 if context.location == "outside" else 0
-        location_campus = 1 if context.location == "campus" else 0
-
-        weather_sunny = 1 if context.weather == "sunny" else 0
-        weather_cloudy = 1 if context.weather == "cloudy" else 0
-        weather_rain = 1 if context.weather == "rain" else 0
-
-        return np.array(
-            [
-                hour,
-                minute,
-                context.focusHours,
-                context.meetings,
-                location_home,
-                location_outside,
-                location_campus,
-                weather_sunny,
-                weather_cloudy,
-                weather_rain,
-            ],
-            dtype=float,
-        ).reshape(1, -1)
+        get_history = None
+        if self.repository is not None:
+            get_history = self.repository.get_user_history
+        self._user_model = UserPreferenceModel(get_user_history=get_history)
 
     def _rule_based(self, context: Context) -> List[Suggestion]:
         hh, _ = context.time.split(":")
@@ -93,29 +62,66 @@ class SuggestionEngine:
 
         return suggestions
 
-    def generate_suggestions(self, context: Context) -> List[Suggestion]:
-        ctx_dict = context.model_dump()
+    def _get_or_train_model(self, user_id: str) -> Optional[Any]:
+        """Return model from cache, from disk, or train if enough history. Updates cache."""
+        if user_id in models_cache:
+            return models_cache[user_id]
+        # Try load from disk
+        loaded = self._user_model.load_model(user_id)
+        if loaded is not None:
+            models_cache[user_id] = loaded
+            return loaded
+        # Train if enough history
+        if self.repository is None:
+            return None
+        history = self.repository.get_user_history(user_id)
+        if len(history) < MIN_SAMPLES:
+            return None
+        fitted = self._user_model.train(user_id)
+        if fitted is not None:
+            models_cache[user_id] = fitted
+            return fitted
+        return None
 
+    def retrain_user(self, user_id: str) -> bool:
+        """Force retrain model for user from MongoDB history. Clears cache then trains."""
+        models_cache.pop(user_id, None)
+        fitted = self._user_model.train(user_id)
+        if fitted is not None:
+            models_cache[user_id] = fitted
+            return True
+        return False
+
+    def generate_suggestions(self, context: Context) -> List[Suggestion]:
+        ctx_dict = context.model_dump() if hasattr(context, "model_dump") else {}
         if self.database:
             self.database.log_context(ctx_dict)
 
+        user_id = getattr(context, "userId", None)
+
+        # User-specific ML path: enough history and model available
+        if user_id and self.repository is not None:
+            history = self.repository.get_user_history(user_id)
+            if len(history) >= MIN_SAMPLES:
+                model = self._get_or_train_model(user_id)
+                if model is not None:
+                    prob = self._user_model.predict_proba(context, user_id=user_id, model=model)
+                    if prob is not None:
+                        if prob < 0.35:
+                            if self.database:
+                                self.database.log_suggestions(ctx_dict, [])
+                            return []
+                        rule_based = self._rule_based(context)
+                        message = rule_based[0].message if rule_based else "Stay hydrated and take a short stretch break."
+                        suggestion = Suggestion(message=message, confidence=round(prob, 4))
+                        if self.database:
+                            self.database.log_suggestions(ctx_dict, [suggestion.model_dump()])
+                        return [suggestion]
+
+        # Fallback: rule-based
         suggestions = self._rule_based(context)
-
-        if self.model is not None:
-            try:
-                features = self._to_features(context)
-                proba = getattr(self.model, "predict_proba", None)
-                if callable(proba):
-                    p = float(proba(features)[0][1])
-                    p = max(0.0, min(1.0, p))
-                    for s in suggestions:
-                        s.confidence = max(s.confidence, p)
-            except Exception:
-                pass
-
         if self.database:
             self.database.log_suggestions(ctx_dict, [s.model_dump() for s in suggestions])
-
         if not suggestions:
             return [
                 Suggestion(
@@ -123,6 +129,4 @@ class SuggestionEngine:
                     confidence=0.5,
                 )
             ]
-
         return suggestions
-

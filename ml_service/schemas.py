@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, validator
 
 
-Location = Literal["home", "outside", "campus"]
+Location = Literal["home", "work", "outside", "campus"]
 Weather = Literal["sunny", "cloudy", "rain"]
 
 
@@ -36,7 +36,9 @@ class Suggestion(BaseModel):
 
 
 class PredictRequest(Context):
-    pass
+    """Context + optional userId for personalized ML."""
+
+    userId: Optional[str] = None
 
 
 class PredictResponse(BaseModel):

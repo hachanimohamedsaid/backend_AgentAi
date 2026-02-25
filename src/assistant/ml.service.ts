@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 
 export interface MlPredictContext {
+  userId?: string;
   time: string;
   location: string;
   weather: string;
@@ -51,6 +52,7 @@ export class MlService {
         this.httpService.post<MlPredictResponse>(
           endpoint,
           {
+            ...(context.userId && { userId: context.userId }),
             time: context.time,
             location: context.location,
             weather: context.weather,

@@ -4,4 +4,6 @@ pydantic
 python-dotenv
 pymongo
 scikit-learn
+joblib
 numpy
+pandas
