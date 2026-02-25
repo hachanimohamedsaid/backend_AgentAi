@@ -373,16 +373,15 @@ export class AssistantService {
       return;
     }
     try {
-      const result = await this.mlService.retrain(userId);
-      if (result?.trained) {
-        const now = new Date();
-        await this.userModel
-          .updateOne(
-            { userId },
-            { $set: { mlTrained: true, lastTrainingAt: now } },
-          )
-          .exec();
-      }
+      await this.mlService.retrain(userId);
+      console.log('ML model retrained successfully for user:', userId);
+      const now = new Date();
+      await this.userModel
+        .updateOne(
+          { userId },
+          { $set: { mlTrained: true, lastTrainingAt: now } },
+        )
+        .exec();
     } catch {
       // Avoid crashing context flow; retrain can be retried on next request
     }
@@ -419,15 +418,14 @@ export class AssistantService {
     }
 
     try {
-      const result = await this.mlService.retrain(userId);
-      if (result?.trained) {
-        await this.userModel
-          .updateOne(
-            { userId },
-            { $set: { mlTrained: true, lastTrainingAt: now } },
-          )
-          .exec();
-      }
+      await this.mlService.retrain(userId);
+      console.log('ML model retrained successfully for user:', userId);
+      await this.userModel
+        .updateOne(
+          { userId },
+          { $set: { mlTrained: true, lastTrainingAt: now } },
+        )
+        .exec();
     } catch {
       // Avoid crashing feedback; retrain can be retried later
     }
