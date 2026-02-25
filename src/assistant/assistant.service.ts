@@ -63,6 +63,8 @@ export class AssistantService {
   async saveContextAndGenerateSuggestions(
     dto: CreateContextDto,
   ): Promise<SuggestionDocument[]> {
+    await this.autoTrainIfNeeded(dto.userId);
+
     await this.contextModel.create({
       userId: dto.userId,
       time: dto.time,
@@ -349,6 +351,40 @@ export class AssistantService {
       });
 
       await this.maybeTriggerRetrain(suggestion.userId, now);
+    }
+  }
+
+  /**
+   * When a user already has enough accepted training samples (e.g. from seed),
+   * trigger ML retrain on first context request so mlTrained becomes true without requiring feedback.
+   */
+  private async autoTrainIfNeeded(userId: string): Promise<void> {
+    const user = await this.userModel.findOne({ userId }).exec();
+    if (!user) {
+      return;
+    }
+    if (user.mlTrained === true) {
+      return;
+    }
+    const acceptedCount = await this.trainingSampleModel
+      .countDocuments({ userId, accepted: true })
+      .exec();
+    if (acceptedCount < ACCEPTED_THRESHOLD) {
+      return;
+    }
+    try {
+      const result = await this.mlService.retrain(userId);
+      if (result?.trained) {
+        const now = new Date();
+        await this.userModel
+          .updateOne(
+            { userId },
+            { $set: { mlTrained: true, lastTrainingAt: now } },
+          )
+          .exec();
+      }
+    } catch {
+      // Avoid crashing context flow; retrain can be retried on next request
     }
   }
 
