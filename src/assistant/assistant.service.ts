@@ -222,7 +222,7 @@ export class AssistantService {
           dayOfWeek,
           suggestionType: c.type,
         });
-        if (probability > 0.6) {
+        if (probability >= 0.5) {
           results.push({
             type: c.type,
             message: c.message,

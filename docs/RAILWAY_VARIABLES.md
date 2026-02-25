@@ -26,7 +26,7 @@ Dans le dashboard **Railway** : ton projet → onglet **Variables** (ou **Settin
 
 | Variable | Où la définir | Exemple / Description |
 |----------|----------------|----------------------|
-| **ML_SERVICE_URL** | **Service backend Nest** (backend_AgentAi) | URL **publique** du service ML sur Railway (sans `/predict`). Ex. `https://incredible-determination.up.railway.app` ou le domaine généré pour le service ML. **Sans cette variable**, le backend appelle `http://127.0.0.1:5001` → erreur `ECONNREFUSED` en production. |
+| **ML_SERVICE_URL** | **Service backend Nest** (backend_AgentAi) | URL **publique** du service ML (sans `/predict`). Ex. `https://incredible-determination-production-a7c3.up.railway.app` (domaine visible dans le service ML → Settings → Networking). **Sans cette variable**, le backend appelle `http://127.0.0.1:5001` → erreur en production. |
 
 ---
 
