@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
@@ -22,6 +23,7 @@ import { MlService } from './ml.service';
 
 @Module({
   imports: [
+    HttpModule.register({ timeout: 15000, maxRedirects: 5 }),
     MongooseModule.forFeature([
       { name: Context.name, schema: ContextSchema },
       { name: Suggestion.name, schema: SuggestionSchema },

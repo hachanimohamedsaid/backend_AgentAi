@@ -47,7 +47,7 @@ export class AssistantService {
   async saveContextAndGenerateSuggestions(
     dto: CreateContextDto,
   ): Promise<SuggestionDocument[]> {
-    const context = await this.contextModel.create({
+    await this.contextModel.create({
       userId: dto.userId,
       time: dto.time,
       location: dto.location,
@@ -55,14 +55,42 @@ export class AssistantService {
       meetings: dto.meetings ?? [],
       focusHours: dto.focusHours,
     });
+    return this.generateSuggestionsFromContextDto(dto);
+  }
 
-    const generated = await this.generateSuggestions(context);
+  /**
+   * Calls ML service /predict with context, then stores each suggestion in MongoDB
+   * with userId, message, confidence, status pending.
+   */
+  async generateSuggestionsFromContextDto(
+    dto: CreateContextDto,
+  ): Promise<SuggestionDocument[]> {
+    const suggestions = await this.mlService.predict({
+      time: dto.time,
+      location: dto.location,
+      weather: dto.weather,
+      focusHours: dto.focusHours,
+      meetings: Array.isArray(dto.meetings) ? dto.meetings.length : 0,
+    });
+
+    if (!suggestions.length) {
+      const fallback = new this.suggestionModel({
+        userId: dto.userId,
+        type: 'break',
+        message: 'Stay hydrated and take a short break when you can.',
+        confidence: 0.5,
+        status: 'pending' as SuggestionStatus,
+      });
+      await fallback.save();
+      return [fallback];
+    }
+
     const docs = await this.suggestionModel.insertMany(
-      generated.map((g) => ({
-        userId: context.userId,
-        type: g.type,
-        message: g.message,
-        confidence: g.baseConfidence,
+      suggestions.map((s) => ({
+        userId: dto.userId,
+        type: 'break' as SuggestionType,
+        message: s.message,
+        confidence: Math.min(1, Math.max(0, s.confidence)),
         status: 'pending' as SuggestionStatus,
       })),
     );
@@ -176,65 +204,7 @@ export class AssistantService {
   private async generateSuggestions(
     context: ContextDocument,
   ): Promise<GeneratedSuggestion[]> {
-    const nowMinutes = this.getMinutes(context.time) ?? 0;
-    const timeOfDay = Math.floor(nowMinutes / 60);
-    const dayOfWeek = new Date().getDay();
-
-    const candidates: { type: SuggestionType; message: string }[] = [];
-
-    if (context.location === 'home') {
-      candidates.push({
-        type: 'coffee',
-        message: 'Want your usual coffee?',
-      });
-    }
-
-    if (this.hasUpcomingMeeting(context, nowMinutes)) {
-      candidates.push({
-        type: 'leave_home',
-        message: 'You should leave now to arrive on time.',
-      });
-    }
-
-    if (context.weather === 'rain') {
-      candidates.push({
-        type: 'umbrella',
-        message: 'Rain is expected. Bring an umbrella.',
-      });
-    }
-
-    if (context.focusHours >= 2) {
-      candidates.push({
-        type: 'break',
-        message: `You've been focused for ${context.focusHours} hours. Take a break.`,
-      });
-    }
-
-    if (!candidates.length) {
-      return [];
-    }
-
-    try {
-      const results: GeneratedSuggestion[] = [];
-      for (const c of candidates) {
-        const probability = await this.mlService.predict({
-          timeOfDay,
-          dayOfWeek,
-          suggestionType: c.type,
-        });
-        if (probability >= 0.5) {
-          results.push({
-            type: c.type,
-            message: c.message,
-            baseConfidence: probability, // confidence = probability
-          });
-        }
-      }
-      return results;
-    } catch {
-      // Safety fallback to rule-based engine
-      return this.generateRuleBasedSuggestions(context);
-    }
+    return this.generateRuleBasedSuggestions(context);
   }
 
   async getTodayPendingSuggestions(
