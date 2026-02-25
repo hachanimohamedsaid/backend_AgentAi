@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ app = FastAPI(title="Assistant ML Service", version="1.0.0")
 
 
 def compute_probability(
-    user_id: str | None,
+    user_id: Optional[str],
     suggestion_type: str,
     time_of_day: int,
     day_of_week: int,
