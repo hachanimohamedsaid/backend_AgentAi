@@ -43,9 +43,9 @@ class SpendingPredictor:
     # ── n8n fetch ─────────────────────────────────────────────────────────────
 
     def _fetch_history(self) -> List[Dict[str, Any]]:
-        """Call n8n webhook and return list of {month, category, total} rows."""
+        """Call n8n webhook (POST) and return list of {month, category, total} rows."""
         with httpx.Client(timeout=15) as client:
-            resp = client.get(N8N_WEBHOOK)
+            resp = client.post(N8N_WEBHOOK, json={})
             resp.raise_for_status()
 
         raw = resp.json()
