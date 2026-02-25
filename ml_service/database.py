@@ -43,7 +43,7 @@ class Database:
             self.contexts = None
 
     def _safe_insert(self, collection, doc: Dict[str, Any]) -> None:
-        if not collection:
+        if collection is None:
             return
         try:
             collection.insert_one(doc)
