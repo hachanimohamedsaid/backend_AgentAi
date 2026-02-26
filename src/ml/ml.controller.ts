@@ -1,4 +1,4 @@
-import { Controller, Get, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Delete, Get, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { MlService } from './ml.service';
 
 @Controller('ml')
@@ -24,6 +24,19 @@ export class MlController {
       this.logger.error('ML prediction failed', err);
       throw new HttpException(
         { message: 'Failed to compute spending prediction', error: String(err) },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('spending-prediction/cache')
+  async clearSpendingCache() {
+    try {
+      return await this.mlService.clearSpendingCache();
+    } catch (err) {
+      this.logger.error('ML cache clear failed', err);
+      throw new HttpException(
+        { message: 'Failed to clear spending prediction cache', error: String(err) },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
