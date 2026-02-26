@@ -5,18 +5,21 @@ export type AssistantFeedbackDocument = AssistantFeedback & Document;
 
 @Schema({ collection: 'assistant_feedback', timestamps: true })
 export class AssistantFeedback {
+  /** Id de la suggestion (ObjectId backend ou id client ex. openai_*) */
   @Prop({ required: true, index: true })
-  userId: string;
-
-  // Can be a Mongo ObjectId (as string) or a contextual id
-  @Prop({ required: true })
   suggestionId: string;
 
-  @Prop({ required: true })
-  type: string;
+  @Prop({ required: true, enum: ['accepted', 'dismissed'] })
+  action: string;
 
-  @Prop({ required: true })
-  accepted: boolean;
+  @Prop({ default: null })
+  userId?: string | null;
+
+  @Prop({ default: null })
+  message?: string | null;
+
+  @Prop({ default: null })
+  type?: string | null;
 
   createdAt?: Date;
   updatedAt?: Date;

@@ -78,11 +78,24 @@ export class AssistantController {
   }
 
   @Post('feedback')
-  async feedback(@Body() dto: AssistantFeedbackDto) {
-    await this.assistantService.handleFeedback(
-      dto.suggestionId,
-      dto.action,
-    );
+  @UseGuards(OptionalJwtAuthGuard)
+  async feedback(@Body() dto: AssistantFeedbackDto, @Req() req: Request) {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      dto.userId?.trim() ||
+      authUser?.userId ||
+      authUser?.id ||
+      authUser?.sub ||
+      undefined;
+    await this.assistantService.handleFeedback({
+      suggestionId: dto.suggestionId,
+      action: dto.action,
+      userId: resolvedUserId,
+      message: dto.message,
+      type: dto.type,
+    });
     return { ok: true };
   }
 }

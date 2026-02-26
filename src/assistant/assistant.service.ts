@@ -518,83 +518,97 @@ export class AssistantService {
       .exec();
   }
 
-  async handleFeedback(
-    suggestionId: string,
-    action: 'accepted' | 'dismissed',
-  ): Promise<void> {
-    if (
-      !suggestionId ||
-      typeof suggestionId !== 'string' ||
-      !/^[a-fA-F0-9]{24}$/.test(suggestionId)
-    ) {
-      throw new BadRequestException(
-        'Invalid suggestion ID. Must be a 24-character hex string (MongoDB ObjectId).',
-      );
-    }
-    const suggestion = await this.suggestionModel
-      .findById(suggestionId)
-      .exec();
-    if (!suggestion) {
-      throw new NotFoundException('Suggestion not found');
-    }
+  async handleFeedback(params: {
+    suggestionId: string;
+    action: 'accepted' | 'dismissed';
+    userId?: string | null;
+    message?: string | null;
+    type?: string | null;
+  }): Promise<void> {
+    const {
+      suggestionId,
+      action,
+      userId: bodyUserId,
+      message: bodyMessage,
+      type: bodyType,
+    } = params;
 
-    if (suggestion.status !== 'pending') {
-      return;
+    if (!suggestionId || typeof suggestionId !== 'string') {
+      throw new BadRequestException('suggestionId is required.');
     }
-
-    suggestion.status = action === 'accepted' ? 'accepted' : 'dismissed';
-    await suggestion.save();
 
     const accepted = action === 'accepted';
 
-    await this.updateHabit(suggestion.userId, suggestion.type, accepted);
-
-    const now = new Date();
-
-    await this.interactionLogModel.create({
-      userId: suggestion.userId,
-      suggestionType: suggestion.type,
+    // 1) Toujours enregistrer le feedback dans assistant_feedback (contrat Flutter + apprentissage)
+    await this.assistantFeedbackModel.create({
+      suggestionId: suggestionId.trim(),
       action,
-      timeOfDay: now.getHours(),
-      dayOfWeek: now.getDay(),
+      userId: bodyUserId?.trim() ?? null,
+      message: bodyMessage?.trim() ?? null,
+      type: bodyType?.trim() ?? null,
     });
 
-    // Store training sample when we have a full context snapshot on the suggestion
-    const hasContext =
-      suggestion.time != null &&
-      suggestion.location != null &&
-      suggestion.weather != null &&
-      suggestion.focusHours != null;
+    const isMongoId = /^[a-fA-F0-9]{24}$/.test(suggestionId.trim());
+    const suggestion = isMongoId
+      ? await this.suggestionModel.findById(suggestionId).exec()
+      : null;
 
-    if (hasContext) {
-      await this.trainingSampleModel.create({
-        userId: suggestion.userId,
-        time: suggestion.time!,
-        location: suggestion.location!,
-        weather: suggestion.weather!,
-        focusHours: suggestion.focusHours!,
-        suggestionType: suggestion.type,
-        accepted,
-      });
+    if (suggestion) {
+      // 2) Si la suggestion existe en base : mettre à jour statut, habits, logs, training, profil ML
+      if (suggestion.status === 'pending') {
+        suggestion.status = accepted ? 'accepted' : 'dismissed';
+        await suggestion.save();
 
-      await this.maybeTriggerRetrain(suggestion.userId, now);
+        await this.updateHabit(suggestion.userId, suggestion.type, accepted);
+
+        const now = new Date();
+        await this.interactionLogModel.create({
+          userId: suggestion.userId,
+          suggestionType: suggestion.type,
+          action,
+          timeOfDay: now.getHours(),
+          dayOfWeek: now.getDay(),
+        });
+
+        const hasContext =
+          suggestion.time != null &&
+          suggestion.location != null &&
+          suggestion.weather != null &&
+          suggestion.focusHours != null;
+
+        if (hasContext) {
+          await this.trainingSampleModel.create({
+            userId: suggestion.userId,
+            time: suggestion.time!,
+            location: suggestion.location!,
+            weather: suggestion.weather!,
+            focusHours: suggestion.focusHours!,
+            suggestionType: suggestion.type,
+            accepted,
+          });
+          await this.maybeTriggerRetrain(suggestion.userId, now);
+        }
+
+        await this.updateAssistantUserProfile(
+          suggestion.userId,
+          suggestion.type,
+          accepted,
+          suggestion.message,
+        );
+      }
+      return;
     }
 
-    // Mirror feedback into assistant_feedback collection for ML service
-    await this.assistantFeedbackModel.create({
-      userId: suggestion.userId,
-      suggestionId: suggestion._id.toString(),
-      type: suggestion.type,
-      accepted,
-    });
-
-    // Update / upsert aggregated ML user profile
-    await this.updateAssistantUserProfile(
-      suggestion.userId,
-      suggestion.type,
-      accepted,
-      suggestion.message,
-    );
+    // 3) Pas de document suggestion en base (ex. id client openai_*) : mettre à jour le profil ML si on a userId
+    const userId = bodyUserId?.trim();
+    if (userId) {
+      await this.updateAssistantUserProfile(
+        userId,
+        bodyType?.trim() || 'other',
+        accepted,
+        bodyMessage?.trim() || '',
+      );
+    }
   }
 
   /**
