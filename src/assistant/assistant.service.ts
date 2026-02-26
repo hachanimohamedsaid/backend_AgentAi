@@ -30,6 +30,10 @@ import {
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { CreateContextDto } from './dto/create-context.dto';
 import { MlService } from './ml.service';
+import {
+  OpenAiSuggestionClient,
+  AvaSuggestion,
+} from './openai-suggestion.client';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -58,7 +62,82 @@ export class AssistantService {
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
     private readonly mlService: MlService,
+    private readonly openAiSuggestions: OpenAiSuggestionClient,
   ) {}
+
+  /**
+   * Génère 3 questions de suggestion (AVA) via OpenAI, à partir
+   * du profil utilisateur + données internes + contexte courant.
+   * N'affecte pas la logique ML existante (retrain, training_samples, etc.).
+   */
+  async generateContextQuestions(
+    dto: CreateContextDto,
+  ): Promise<AvaSuggestion[]> {
+    const user = await this.userModel.findOne({ userId: dto.userId }).exec();
+
+    const profile = {
+      name: user?.name ?? 'Unknown user',
+      role: user?.role ?? null,
+      bio: user?.bio ?? null,
+      location: user?.location ?? null,
+    };
+
+    const behaviorSummary = {
+      timeOfDay: dto.time,
+      focusHours: dto.focusHours,
+      location: dto.location,
+      weather: dto.weather,
+    };
+
+    // Pour l'instant on ne lit pas encore les emails / finance / projets détaillés,
+    // on construit des résumés simples basés sur ce que l'assistant connaît déjà.
+    const recentContexts = await this.contextModel
+      .find({ userId: dto.userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean()
+      .exec();
+
+    const recentSuggestions = await this.suggestionModel
+      .find({ userId: dto.userId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean()
+      .exec();
+
+    const emailsSummary =
+      'Emails data is not yet connected to the assistant backend.';
+
+    const financeSummary =
+      'Finance data is not yet fully connected; focus on general spending and savings habits.';
+
+    const projectsSummary =
+      recentSuggestions.length > 0
+        ? `The assistant recently proposed ${recentSuggestions.length} suggestions (types: ${[
+            ...new Set(recentSuggestions.map((s) => s.type)),
+          ].join(', ')}).`
+        : 'No recent assistant suggestions found for this user.';
+
+    const goalsSummary =
+      'Goals module is available in the app, but no explicit goals summary is wired yet for this context.';
+
+    const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
+
+    const contextForModel = {
+      profile,
+      appDataSummary: {
+        emailsSummary,
+        financeSummary,
+        projectsSummary,
+        goalsSummary,
+      },
+      behaviorSummary,
+      learnedPreferences,
+      recentContexts,
+    };
+
+    return this.openAiSuggestions.generateSuggestions(contextForModel);
+  }
 
   async saveContextAndGenerateSuggestions(
     dto: CreateContextDto,
@@ -74,6 +153,53 @@ export class AssistantService {
       focusHours: dto.focusHours,
     });
     return this.generateSuggestionsFromContextDto(dto);
+  }
+
+  private async buildLearnedPreferences(userId: string): Promise<string | null> {
+    const samples = await this.trainingSampleModel
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean()
+      .exec();
+
+    if (!samples.length) {
+      return null;
+    }
+
+    const stats: Record<
+      string,
+      { accepted: number; dismissed: number }
+    > = {};
+
+    for (const s of samples) {
+      const key = s.suggestionType ?? 'unknown';
+      if (!stats[key]) {
+        stats[key] = { accepted: 0, dismissed: 0 };
+      }
+      if (s.accepted) {
+        stats[key].accepted += 1;
+      } else {
+        stats[key].dismissed += 1;
+      }
+    }
+
+    const acceptedThemes = Object.entries(stats)
+      .filter(([, v]) => v.accepted > v.dismissed)
+      .map(([k]) => k);
+    const refusedThemes = Object.entries(stats)
+      .filter(([, v]) => v.dismissed > v.accepted)
+      .map(([k]) => k);
+
+    const parts: string[] = [];
+    if (acceptedThemes.length) {
+      parts.push(`User tends to accept: ${acceptedThemes.join(', ')}.`);
+    }
+    if (refusedThemes.length) {
+      parts.push(`User tends to refuse: ${refusedThemes.join(', ')}.`);
+    }
+
+    return parts.length ? parts.join(' ') : null;
   }
 
   /**

@@ -25,6 +25,7 @@ import {
 } from './schemas/training-sample.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { MlService } from './ml.service';
+import { OpenAiSuggestionClient } from './openai-suggestion.client';
 
 @Module({
   imports: [
@@ -39,6 +40,6 @@ import { MlService } from './ml.service';
     ]),
   ],
   controllers: [AssistantController],
-  providers: [AssistantService, MlService],
+  providers: [AssistantService, MlService, OpenAiSuggestionClient],
 })
 export class AssistantModule {}
