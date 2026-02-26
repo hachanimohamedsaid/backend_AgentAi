@@ -57,3 +57,14 @@ class Database:
             self._predictions_col.insert_one(doc)
         except PyMongoError as exc:
             print(f"[DB] Failed to save prediction: {exc}")
+
+    def clear_cache(self) -> int:
+        """Delete all cached predictions. Returns count of deleted documents."""
+        if not self.available:
+            return 0
+        try:
+            result = self._predictions_col.delete_many({})
+            return result.deleted_count
+        except PyMongoError as exc:
+            print(f"[DB] Failed to clear cache: {exc}")
+            return 0
