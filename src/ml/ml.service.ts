@@ -31,9 +31,21 @@ export class MlService {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(
-        `Python ML service responded ${res.status}: ${text}`,
-      );
+      throw new Error(`Python ML service responded ${res.status}: ${text}`);
+    }
+
+    return res.json() as Promise<object>;
+  }
+
+  async clearSpendingCache(): Promise<object> {
+    const url = `${this.getPythonServiceUrl()}/spending-prediction/cache`;
+    this.logger.log(`Clearing Python ML cache: ${url}`);
+
+    const res = await fetch(url, { method: 'DELETE' });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Python ML service responded ${res.status}: ${text}`);
     }
 
     return res.json() as Promise<object>;
