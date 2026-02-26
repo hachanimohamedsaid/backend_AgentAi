@@ -4,10 +4,14 @@ import {
   Get,
   Param,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AssistantService } from './assistant.service';
 import { CreateContextDto } from './dto/create-context.dto';
 import { AssistantFeedbackDto } from './dto/feedback.dto';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('assistant')
 export class AssistantController {
@@ -30,17 +34,36 @@ export class AssistantController {
    * }
    */
   @Post('context')
-  async handleContext(@Body() dto: CreateContextDto) {
+  @UseGuards(OptionalJwtAuthGuard)
+  async handleContext(
+    @Body() dto: CreateContextDto,
+    @Req() req: Request,
+  ) {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      authUser?.userId ?? authUser?.id ?? authUser?.sub ?? dto.userId;
+
+    const effectiveDto: CreateContextDto = {
+      ...dto,
+      userId: resolvedUserId,
+    };
+
     // Conserve la logique existante (contexte + ML / suggestions enregistrées)
     // pour le tracking et le training, mais les questions affichées au front
     // viennent de l'IA AVA (OpenAI) via generateContextQuestions.
-    await this.assistantService.saveContextAndGenerateSuggestions(dto);
+    await this.assistantService.saveContextAndGenerateSuggestions(effectiveDto);
 
     const suggestions =
-      await this.assistantService.generateContextQuestions(dto);
-    return {
-      suggestions,
-    };
+      await this.assistantService.generateContextQuestions(effectiveDto);
+
+    return suggestions.slice(0, 3).map((s, index) => ({
+      id: `ctx_${index + 1}_${s.type ?? 'other'}`,
+      type: s.type,
+      message: s.message,
+      confidence: s.confidence,
+    }));
   }
 
   @Get('suggestions/:userId')

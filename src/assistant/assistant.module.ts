@@ -26,9 +26,12 @@ import {
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { MlService } from './ml.service';
 import { OpenAiSuggestionClient } from './openai-suggestion.client';
+import { Goal, GoalSchema } from '../goals/schemas/goal.schema';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
+    AuthModule,
     HttpModule.register({ timeout: 15000, maxRedirects: 5 }),
     MongooseModule.forFeature([
       { name: Context.name, schema: ContextSchema },
@@ -37,6 +40,7 @@ import { OpenAiSuggestionClient } from './openai-suggestion.client';
       { name: InteractionLog.name, schema: InteractionLogSchema },
       { name: TrainingSample.name, schema: TrainingSampleSchema },
       { name: User.name, schema: UserSchema },
+      { name: Goal.name, schema: GoalSchema },
     ]),
   ],
   controllers: [AssistantController],

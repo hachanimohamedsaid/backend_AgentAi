@@ -34,6 +34,7 @@ import {
   OpenAiSuggestionClient,
   AvaSuggestion,
 } from './openai-suggestion.client';
+import { Goal, GoalDocument } from '../goals/schemas/goal.schema';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -61,6 +62,8 @@ export class AssistantService {
     private readonly trainingSampleModel: Model<TrainingSampleDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @InjectModel(Goal.name)
+    private readonly goalModel: Model<GoalDocument>,
     private readonly mlService: MlService,
     private readonly openAiSuggestions: OpenAiSuggestionClient,
   ) {}
@@ -105,6 +108,13 @@ export class AssistantService {
       .lean()
       .exec();
 
+    const goals = await this.goalModel
+      .find({ userId: dto.userId })
+      .sort({ updatedAt: -1 })
+      .limit(20)
+      .lean()
+      .exec();
+
     const emailsSummary =
       'Emails data is not yet connected to the assistant backend.';
 
@@ -113,13 +123,35 @@ export class AssistantService {
 
     const projectsSummary =
       recentSuggestions.length > 0
-        ? `The assistant recently proposed ${recentSuggestions.length} suggestions (types: ${[
+        ? `The assistant recently proposed ${recentSuggestions.length} suggestions for this user (types: ${[
             ...new Set(recentSuggestions.map((s) => s.type)),
           ].join(', ')}).`
         : 'No recent assistant suggestions found for this user.';
 
-    const goalsSummary =
-      'Goals module is available in the app, but no explicit goals summary is wired yet for this context.';
+    let goalsSummary: string;
+    if (!goals.length) {
+      goalsSummary =
+        'No explicit goals are registered for this user yet in the goals module.';
+    } else {
+      const total = goals.length;
+      const avgProgress =
+        goals.reduce(
+          (sum: number, g: any) => sum + (g.progress ?? 0),
+          0,
+        ) / total;
+      const categories = Array.from(
+        new Set(
+          goals
+            .map((g: any) => g.category)
+            .filter((c: unknown): c is string => typeof c === 'string'),
+        ),
+      );
+      const topCategories =
+        categories.length > 0 ? categories.slice(0, 3).join(', ') : 'general';
+      goalsSummary = `User has ${total} active goals (avg progress about ${Math.round(
+        avgProgress,
+      )}%). Main categories: ${topCategories}.`;
+    }
 
     const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
 
