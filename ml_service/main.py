@@ -87,6 +87,13 @@ def spending_prediction() -> SpendingPredictionResponse:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@app.delete("/spending-prediction/cache")
+def clear_spending_cache() -> dict:
+    """Force-clear the MongoDB prediction cache so the next GET recomputes fresh."""
+    deleted = spending_db.clear_cache()
+    return {"deleted": deleted, "message": "Cache cleared. Next request will recompute."}
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
