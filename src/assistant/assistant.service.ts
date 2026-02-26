@@ -35,6 +35,14 @@ import {
   AvaSuggestion,
 } from './openai-suggestion.client';
 import { Goal, GoalDocument } from '../goals/schemas/goal.schema';
+import {
+  AssistantFeedback,
+  AssistantFeedbackDocument,
+} from './schemas/assistant-feedback.schema';
+import {
+  AssistantUserProfile,
+  AssistantUserProfileDocument,
+} from './schemas/assistant-user-profile.schema';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -64,6 +72,10 @@ export class AssistantService {
     private readonly userModel: Model<UserDocument>,
     @InjectModel(Goal.name)
     private readonly goalModel: Model<GoalDocument>,
+    @InjectModel(AssistantFeedback.name)
+    private readonly assistantFeedbackModel: Model<AssistantFeedbackDocument>,
+    @InjectModel(AssistantUserProfile.name)
+    private readonly assistantUserProfileModel: Model<AssistantUserProfileDocument>,
     private readonly mlService: MlService,
     private readonly openAiSuggestions: OpenAiSuggestionClient,
   ) {}
@@ -187,7 +199,65 @@ export class AssistantService {
     return this.generateSuggestionsFromContextDto(dto);
   }
 
+  /**
+   * Generate AVA suggestions via OpenAI and persist them into assistant_suggestions
+   * so that feedback and ML can consume them later.
+   */
+  async generateAndStoreAvaSuggestions(
+    dto: CreateContextDto,
+  ): Promise<SuggestionDocument[]> {
+    const avaSuggestions = await this.generateContextQuestions(dto);
+    if (!avaSuggestions.length) {
+      return [];
+    }
+
+    const contextFields = {
+      time: dto.time,
+      location: dto.location,
+      weather: dto.weather,
+      focusHours: dto.focusHours,
+    };
+
+    const docs = await this.suggestionModel.insertMany(
+      avaSuggestions.slice(0, 3).map((s) => ({
+        userId: dto.userId,
+        type: s.type ?? 'other',
+        message: s.message,
+        confidence: Math.min(1, Math.max(0, s.confidence)),
+        status: 'pending' as SuggestionStatus,
+        source: 'openai' as const,
+        ...contextFields,
+      })),
+    );
+
+    return docs;
+  }
+
   private async buildLearnedPreferences(userId: string): Promise<string | null> {
+    // 1) Prefer using aggregated ML profile if it exists
+    const profile = await this.assistantUserProfileModel
+      .findOne({ userId })
+      .lean()
+      .exec();
+
+    if (profile) {
+      const parts: string[] = [];
+      if (profile.acceptedTypes?.length) {
+        parts.push(
+          `User tends to accept: ${profile.acceptedTypes.join(', ')}.`,
+        );
+      }
+      if (profile.dismissedTypes?.length) {
+        parts.push(
+          `User tends to refuse: ${profile.dismissedTypes.join(', ')}.`,
+        );
+      }
+      if (parts.length) {
+        return parts.join(' ');
+      }
+    }
+
+    // 2) Fallback: derive preferences directly from recent training samples
     const samples = await this.trainingSampleModel
       .find({ userId })
       .sort({ createdAt: -1 })
@@ -475,13 +545,12 @@ export class AssistantService {
     suggestion.status = action === 'accepted' ? 'accepted' : 'dismissed';
     await suggestion.save();
 
-    await this.updateHabit(
-      suggestion.userId,
-      suggestion.type,
-      action === 'accepted',
-    );
+    const accepted = action === 'accepted';
+
+    await this.updateHabit(suggestion.userId, suggestion.type, accepted);
 
     const now = new Date();
+
     await this.interactionLogModel.create({
       userId: suggestion.userId,
       suggestionType: suggestion.type,
@@ -490,7 +559,7 @@ export class AssistantService {
       dayOfWeek: now.getDay(),
     });
 
-    // Store training sample when we 3333b33333have context snapshot on the suggestion
+    // Store training sample when we have a full context snapshot on the suggestion
     const hasContext =
       suggestion.time != null &&
       suggestion.location != null &&
@@ -505,11 +574,27 @@ export class AssistantService {
         weather: suggestion.weather!,
         focusHours: suggestion.focusHours!,
         suggestionType: suggestion.type,
-        accepted: action === 'accepted',
+        accepted,
       });
 
       await this.maybeTriggerRetrain(suggestion.userId, now);
     }
+
+    // Mirror feedback into assistant_feedback collection for ML service
+    await this.assistantFeedbackModel.create({
+      userId: suggestion.userId,
+      suggestionId: suggestion._id.toString(),
+      type: suggestion.type,
+      accepted,
+    });
+
+    // Update / upsert aggregated ML user profile
+    await this.updateAssistantUserProfile(
+      suggestion.userId,
+      suggestion.type,
+      accepted,
+      suggestion.message,
+    );
   }
 
   /**
@@ -617,6 +702,62 @@ export class AssistantService {
     habit.occurrences = (habit.occurrences ?? 0) + 1;
     habit.lastUsedAt = now;
     await habit.save();
+  }
+
+  private async updateAssistantUserProfile(
+    userId: string,
+    type: string,
+    accepted: boolean,
+    message: string,
+  ): Promise<void> {
+    const now = new Date();
+
+    let profile = await this.assistantUserProfileModel
+      .findOne({ userId })
+      .exec();
+
+    if (!profile) {
+      profile = new this.assistantUserProfileModel({
+        userId,
+        acceptedTypes: [],
+        dismissedTypes: [],
+        acceptedExamples: [],
+        dismissedExamples: [],
+        lastUpdatedAt: now,
+      });
+    }
+
+    const acceptedTypes = new Set(profile.acceptedTypes ?? []);
+    const dismissedTypes = new Set(profile.dismissedTypes ?? []);
+
+    if (accepted) {
+      acceptedTypes.add(type);
+    } else {
+      dismissedTypes.add(type);
+    }
+
+    profile.acceptedTypes = Array.from(acceptedTypes);
+    profile.dismissedTypes = Array.from(dismissedTypes);
+
+    const snippet =
+      typeof message === 'string'
+        ? message.length > 160
+          ? `${message.slice(0, 157)}...`
+          : message
+        : '';
+
+    if (snippet) {
+      const field = accepted ? 'acceptedExamples' : 'dismissedExamples';
+      const current = (profile as any)[field] as string[] | undefined;
+      const updated = Array.from(new Set([snippet, ...(current ?? [])])).slice(
+        0,
+        20,
+      );
+      (profile as any)[field] = updated;
+    }
+
+    profile.lastUpdatedAt = now;
+    await profile.save();
   }
 }
 

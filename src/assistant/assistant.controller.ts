@@ -55,15 +55,19 @@ export class AssistantController {
     // viennent de l'IA AVA (OpenAI) via generateContextQuestions.
     await this.assistantService.saveContextAndGenerateSuggestions(effectiveDto);
 
-    const suggestions =
-      await this.assistantService.generateContextQuestions(effectiveDto);
+    // Generate AVA (OpenAI) questions and persist them so feedback can be learned
+    const avaSuggestionDocs =
+      await this.assistantService.generateAndStoreAvaSuggestions(effectiveDto);
 
-    return suggestions.slice(0, 3).map((s, index) => ({
-      id: `ctx_${index + 1}_${s.type ?? 'other'}`,
-      type: s.type,
-      message: s.message,
-      confidence: s.confidence,
-    }));
+    return avaSuggestionDocs.slice(0, 3).map((s) => {
+      const obj = s.toJSON ? (s.toJSON() as any) : (s as any);
+      return {
+        id: obj.id ?? obj._id?.toString(),
+        type: s.type,
+        message: s.message,
+        confidence: s.confidence,
+      };
+    });
   }
 
   @Get('suggestions/:userId')

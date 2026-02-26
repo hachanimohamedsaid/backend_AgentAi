@@ -9,10 +9,8 @@ export class Habit {
   @Prop({ required: true, index: true })
   userId: string;
 
-  @Prop({
-    required: true,
-    enum: ['coffee', 'leave_home', 'umbrella', 'break'],
-  })
+  // Track success rate per suggestion type (free-form string)
+  @Prop({ required: true })
   suggestionType: SuggestionType;
 
   /** Success rate between 0 and 1 */

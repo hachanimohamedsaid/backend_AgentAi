@@ -28,6 +28,14 @@ import { MlService } from './ml.service';
 import { OpenAiSuggestionClient } from './openai-suggestion.client';
 import { Goal, GoalSchema } from '../goals/schemas/goal.schema';
 import { AuthModule } from '../auth/auth.module';
+import {
+  AssistantFeedback,
+  AssistantFeedbackSchema,
+} from './schemas/assistant-feedback.schema';
+import {
+  AssistantUserProfile,
+  AssistantUserProfileSchema,
+} from './schemas/assistant-user-profile.schema';
 
 @Module({
   imports: [
@@ -41,6 +49,8 @@ import { AuthModule } from '../auth/auth.module';
       { name: TrainingSample.name, schema: TrainingSampleSchema },
       { name: User.name, schema: UserSchema },
       { name: Goal.name, schema: GoalSchema },
+      { name: AssistantFeedback.name, schema: AssistantFeedbackSchema },
+      { name: AssistantUserProfile.name, schema: AssistantUserProfileSchema },
     ]),
   ],
   controllers: [AssistantController],

@@ -8,10 +8,8 @@ export class InteractionLog {
   @Prop({ required: true, index: true })
   userId: string;
 
-  @Prop({
-    required: true,
-    enum: ['coffee', 'leave_home', 'umbrella', 'break'],
-  })
+  // Free-form suggestion type, aligned with Suggestion.type
+  @Prop({ required: true })
   suggestionType: string;
 
   @Prop({ required: true, enum: ['accepted', 'dismissed'] })
