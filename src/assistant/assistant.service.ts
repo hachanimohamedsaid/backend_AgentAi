@@ -347,7 +347,71 @@ export class AssistantService {
       });
     }
 
+    const mlSignals = await this.buildMlSignalsForUser(userId, latestContext as any);
+    signals.push(...mlSignals);
+
     return signals;
+  }
+
+  /**
+   * Appelle le service ML pour ce user avec le dernier contexte et transforme
+   * les prédictions en signaux de notification personnalisés (ML_SUGGESTION).
+   */
+  private async buildMlSignalsForUser(
+    userId: string,
+    latestContext: {
+      time: string;
+      location: string;
+      weather: string;
+      focusHours: number;
+      meetings?: Array<{ title: string; time: string }>;
+    },
+  ): Promise<Array<{ signalType: string; payload?: Record<string, any>; source: string }>> {
+    const user = await this.userModel.findOne({ userId }).lean().exec();
+    if (!user?.mlTrained) {
+      return [];
+    }
+
+    try {
+      const suggestions = await this.mlService.predict({
+        userId,
+        time: latestContext.time,
+        location: latestContext.location,
+        weather: latestContext.weather,
+        focusHours:
+          typeof latestContext.focusHours === 'number' ? latestContext.focusHours : 0,
+        meetings: Array.isArray(latestContext.meetings) ? latestContext.meetings.length : 0,
+      });
+
+      if (!Array.isArray(suggestions) || suggestions.length === 0) {
+        return [];
+      }
+
+      const out: Array<{
+        signalType: string;
+        payload?: Record<string, any>;
+        source: string;
+      }> = [];
+
+      const minConfidence = 0.5;
+      for (const s of suggestions) {
+        if (!s || typeof s.message !== 'string' || (s.confidence ?? 0) < minConfidence) {
+          continue;
+        }
+        out.push({
+          signalType: 'ML_PERSONALIZED_SUGGESTION',
+          payload: {
+            message: s.message.trim(),
+            confidence: Math.min(1, Math.max(0, Number(s.confidence) ?? 0.5)),
+          },
+          source: 'ml',
+        });
+      }
+
+      return out;
+    } catch {
+      return [];
+    }
   }
 
   private async buildLearnedPreferences(userId: string): Promise<string | null> {

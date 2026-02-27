@@ -64,8 +64,10 @@ RULES:
 INPUT (provided as JSON in the user message):
 - profile: { name, role }
 - locale, timezone, tone
-- learnedPreferences: string | null
+- learnedPreferences: string | null (what this user tends to accept or refuse)
 - signals: array of objects with { signalType, payload, scores, occurredAt, source }
+  - source "ml" = personalized suggestion from our ML model for this user (use payload.message as basis; make the notification feel personal and relevant).
+  - source "backend" = from app context (meetings, focus, weather). Other sources = e.g. email from front.
 
 OUTPUT FORMAT (JSON array, max length = maxItems):
 [
