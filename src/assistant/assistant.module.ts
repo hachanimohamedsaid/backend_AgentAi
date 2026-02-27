@@ -30,10 +30,6 @@ import { OpenAiNotificationClient } from './openai-notification.client';
 import { Goal, GoalSchema } from '../goals/schemas/goal.schema';
 import { AuthModule } from '../auth/auth.module';
 import {
-  AssistantNotification,
-  AssistantNotificationSchema,
-} from './schemas/assistant-notification.schema';
-import {
   AssistantFeedback,
   AssistantFeedbackSchema,
 } from './schemas/assistant-feedback.schema';
@@ -56,7 +52,6 @@ import {
       { name: Goal.name, schema: GoalSchema },
       { name: AssistantFeedback.name, schema: AssistantFeedbackSchema },
       { name: AssistantUserProfile.name, schema: AssistantUserProfileSchema },
-      { name: AssistantNotification.name, schema: AssistantNotificationSchema },
     ]),
   ],
   controllers: [AssistantController],
