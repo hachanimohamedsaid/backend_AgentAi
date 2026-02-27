@@ -12,13 +12,13 @@ export class AssistantFeedback {
   @Prop({ required: true, enum: ['accepted', 'dismissed'] })
   action: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   userId?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   message?: string | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   type?: string | null;
 
   createdAt?: Date;
