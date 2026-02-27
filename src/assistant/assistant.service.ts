@@ -240,8 +240,9 @@ export class AssistantService {
   }
 
   /**
-   * Transform normalized "signals" (backend/ML/Mongo) into user notifications.
+   * Transform normalized "signals" (backend/ML/Mongo + front) into user notifications.
    * Uses OpenAI when configured; does NOT persist anything in Mongo.
+   * Signaux = signaux construits depuis le contexte Mongo (réunions, pause) + signaux envoyés par le front (emails, etc.).
    */
   async generateNotifications(
     dto: GenerateNotificationsDto,
@@ -257,7 +258,13 @@ export class AssistantService {
     const timezone = dto.timezone?.trim() || 'Africa/Tunis';
     const tone = dto.tone ?? 'professional';
     const maxItems = dto.maxItems ?? 5;
-    const signals = Array.isArray(dto.signals) ? dto.signals : [];
+
+    const backendSignals = await this.buildBackendSignals(
+      dto.userId,
+      dto.currentTime?.trim(),
+    );
+    const frontSignals = Array.isArray(dto.signals) ? dto.signals : [];
+    const signals = [...backendSignals, ...frontSignals];
 
     const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
 
@@ -272,6 +279,75 @@ export class AssistantService {
     });
 
     return ai;
+  }
+
+  /**
+   * Construit des signaux à partir des données Mongo/ML (contexte, réunions, focus)
+   * pour que les notifications ne soient pas limitées aux seuls emails envoyés par le front.
+   */
+  private async buildBackendSignals(
+    userId: string,
+    currentTime?: string,
+  ): Promise<Array<{ signalType: string; payload?: Record<string, any>; source: string }>> {
+    const latestContext = await this.contextModel
+      .findOne({ userId })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    if (!latestContext) {
+      return [];
+    }
+
+    const nowMinutes: number =
+      (currentTime ? this.getMinutes(currentTime) : null) ??
+      this.getMinutes((latestContext as any).time) ??
+      0;
+    const signals: Array<{
+      signalType: string;
+      payload?: Record<string, any>;
+      source: string;
+    }> = [];
+
+    const meetings = (latestContext as any).meetings ?? [];
+    const location = (latestContext as any).location ?? null;
+
+    for (const m of meetings) {
+      const mt = this.getMinutes(m.time);
+      if (mt === null) continue;
+      if (mt < nowMinutes) continue;
+      const startsInMin = mt - nowMinutes;
+      if (startsInMin > 45) continue;
+      signals.push({
+        signalType: 'MEETING_SOON',
+        payload: {
+          title: m.title,
+          startsInMin,
+          location: location ?? undefined,
+        },
+        source: 'backend',
+      });
+    }
+
+    const focusHours = (latestContext as any).focusHours;
+    if (typeof focusHours === 'number' && focusHours >= 2) {
+      signals.push({
+        signalType: 'BREAK_SUGGESTED',
+        payload: { focusHours },
+        source: 'backend',
+      });
+    }
+
+    const weather = (latestContext as any).weather;
+    if (weather === 'rain') {
+      signals.push({
+        signalType: 'WEATHER_ALERT',
+        payload: { condition: 'rain', message: 'Rain expected' },
+        source: 'backend',
+      });
+    }
+
+    return signals;
   }
 
   private async buildLearnedPreferences(userId: string): Promise<string | null> {

@@ -81,6 +81,11 @@ export class GenerateNotificationsDto {
   @IsString()
   timezone?: string;
 
+  /** Heure actuelle HH:mm (pour calculer "réunion dans X min"). Si absent, le backend utilise le dernier contexte. */
+  @IsOptional()
+  @IsString()
+  currentTime?: string;
+
   /** If provided, backend will generate max N notifications */
   @IsOptional()
   @IsNumber()
