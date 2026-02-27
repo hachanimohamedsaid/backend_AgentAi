@@ -34,6 +34,11 @@ import {
   OpenAiSuggestionClient,
   AvaSuggestion,
 } from './openai-suggestion.client';
+import {
+  OpenAiNotificationClient,
+  AssistantNotification,
+  AssistantNotificationPriority,
+} from './openai-notification.client';
 import { Goal, GoalDocument } from '../goals/schemas/goal.schema';
 import {
   AssistantFeedback,
@@ -43,6 +48,8 @@ import {
   AssistantUserProfile,
   AssistantUserProfileDocument,
 } from './schemas/assistant-user-profile.schema';
+import { GenerateNotificationsDto } from './dto/generate-notifications.dto';
+import { randomUUID, createHash } from 'crypto';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -78,6 +85,7 @@ export class AssistantService {
     private readonly assistantUserProfileModel: Model<AssistantUserProfileDocument>,
     private readonly mlService: MlService,
     private readonly openAiSuggestions: OpenAiSuggestionClient,
+    private readonly openAiNotifications: OpenAiNotificationClient,
   ) {}
 
   /**
@@ -233,6 +241,51 @@ export class AssistantService {
     return docs;
   }
 
+  /**
+   * Transform normalized "signals" (backend/ML/Mongo) into user notifications.
+   * Uses OpenAI when configured, otherwise falls back to deterministic templates.
+   */
+  async generateNotifications(
+    dto: GenerateNotificationsDto,
+  ): Promise<AssistantNotification[]> {
+    const user = await this.userModel.findOne({ userId: dto.userId }).exec();
+
+    const profile = {
+      name: user?.name ?? null,
+      role: user?.role ?? null,
+    };
+
+    const locale = dto.locale?.trim() || 'fr-TN';
+    const timezone = dto.timezone?.trim() || 'Africa/Tunis';
+    const tone = dto.tone ?? 'professional';
+    const maxItems = dto.maxItems ?? 5;
+    const signals = Array.isArray(dto.signals) ? dto.signals : [];
+
+    const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
+
+    const ai = await this.openAiNotifications.generateNotifications({
+      profile,
+      locale,
+      timezone,
+      tone,
+      learnedPreferences,
+      signals,
+      maxItems,
+    });
+
+    const base =
+      ai.length > 0
+        ? ai
+        : this.generateFallbackNotifications({
+            locale,
+            timezone,
+            signals,
+            maxItems,
+          });
+
+    return this.dedupeNotifications(base).slice(0, maxItems);
+  }
+
   private async buildLearnedPreferences(userId: string): Promise<string | null> {
     // 1) Prefer using aggregated ML profile if it exists
     const profile = await this.assistantUserProfileModel
@@ -302,6 +355,356 @@ export class AssistantService {
     }
 
     return parts.length ? parts.join(' ') : null;
+  }
+
+  private dedupeNotifications(
+    items: AssistantNotification[],
+  ): AssistantNotification[] {
+    const seen = new Set<string>();
+    const out: AssistantNotification[] = [];
+    for (const n of items) {
+      const key = n?.meta?.dedupeKey;
+      if (!key || typeof key !== 'string') continue;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(n);
+    }
+    return out;
+  }
+
+  private generateFallbackNotifications(params: {
+    locale: string;
+    timezone: string;
+    signals: any[];
+    maxItems: number;
+  }): AssistantNotification[] {
+    const { locale, signals, maxItems } = params;
+    const lang = this.pickLang(locale);
+
+    const out: AssistantNotification[] = [];
+
+    for (const s of signals) {
+      const signalType =
+        s && typeof s === 'object' ? String((s as any).signalType ?? '') : '';
+      const payload =
+        s && typeof s === 'object' && (s as any).payload
+          ? (s as any).payload
+          : {};
+
+      const dedupeKey = this.computeDedupeKey(signalType, payload);
+      if (!dedupeKey) continue;
+
+      const { title, message, category, priority, actions, expiresAt } =
+        this.templateFromSignal(lang, signalType, payload);
+
+      if (!title || !message) continue;
+
+      out.push({
+        id: `fallback_${randomUUID()}`,
+        title,
+        message,
+        category,
+        priority,
+        actions,
+        meta: { dedupeKey, expiresAt },
+      });
+
+      if (out.length >= maxItems) break;
+    }
+
+    // If no signals or unknown signals, provide a minimal default
+    if (!out.length) {
+      out.push({
+        id: `fallback_${randomUUID()}`,
+        title:
+          lang === 'ar'
+            ? 'تحديثاتك'
+            : lang === 'en'
+              ? 'Your updates'
+              : 'Vos mises à jour',
+        message:
+          lang === 'ar'
+            ? 'لا توجد إشعارات ذات أولوية الآن.'
+            : lang === 'en'
+              ? 'No high-priority notifications right now.'
+              : "Aucune notification prioritaire pour le moment.",
+        category: 'General',
+        priority: 'low',
+        actions: [],
+        meta: { dedupeKey: 'fallback:empty' },
+      });
+    }
+
+    return out;
+  }
+
+  private pickLang(locale: string): 'fr' | 'en' | 'ar' {
+    const l = (locale || '').toLowerCase();
+    if (l.startsWith('ar')) return 'ar';
+    if (l.startsWith('en')) return 'en';
+    return 'fr';
+  }
+
+  private computeDedupeKey(signalType: string, payload: any): string | null {
+    if (!signalType || typeof signalType !== 'string') return null;
+    const base = {
+      signalType: signalType.trim().toUpperCase(),
+      payload:
+        payload && typeof payload === 'object'
+          ? this.sortObjectShallow(payload)
+          : payload ?? null,
+    };
+    const hash = createHash('sha1')
+      .update(JSON.stringify(base))
+      .digest('hex')
+      .slice(0, 12);
+    return `sig:${base.signalType}:${hash}`;
+  }
+
+  private sortObjectShallow(obj: Record<string, any>): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const k of Object.keys(obj).sort()) {
+      out[k] = obj[k];
+    }
+    return out;
+  }
+
+  private templateFromSignal(
+    lang: 'fr' | 'en' | 'ar',
+    signalType: string,
+    payload: Record<string, any>,
+  ): {
+    title: string;
+    message: string;
+    category: string;
+    priority: AssistantNotificationPriority;
+    actions: { label: string; action: string; data?: Record<string, any> }[];
+    expiresAt?: string;
+  } {
+    const t = (signalType || '').trim().toUpperCase();
+
+    if (t === 'MEETING_SOON') {
+      const title = payload.title ?? payload.name ?? 'Meeting';
+      const startsInMin = payload.startsInMin ?? payload.inMinutes ?? null;
+      const location = payload.location ?? null;
+      const when =
+        typeof startsInMin === 'number'
+          ? lang === 'ar'
+            ? `بعد ${startsInMin} دقيقة`
+            : lang === 'en'
+              ? `in ${startsInMin} minutes`
+              : `dans ${startsInMin} minutes`
+          : '';
+      const where =
+        location && typeof location === 'string'
+          ? lang === 'ar'
+            ? `المكان: ${location}`
+            : lang === 'en'
+              ? `Location: ${location}`
+              : `Lieu : ${location}`
+          : '';
+
+      return {
+        title:
+          lang === 'ar'
+            ? 'اجتماع قريب'
+            : lang === 'en'
+              ? 'Meeting soon'
+              : 'Réunion imminente',
+        message:
+          lang === 'ar'
+            ? `${title}${when ? ` ${when}` : ''}.${where ? ` ${where}` : ''}`
+            : lang === 'en'
+              ? `${title}${when ? ` ${when}` : ''}.${where ? ` ${where}` : ''}`
+              : `${title}${when ? ` ${when}` : ''}.${where ? ` ${where}` : ''}`,
+        category: 'Work',
+        priority: 'high',
+        actions: [
+          {
+            label:
+              lang === 'ar'
+                ? 'عرض التفاصيل'
+                : lang === 'en'
+                  ? 'View details'
+                  : 'Voir les détails',
+            action: 'OPEN_MEETING',
+            data: payload.meetingId ? { meetingId: payload.meetingId } : undefined,
+          },
+          {
+            label:
+              lang === 'ar'
+                ? 'تذكير لاحقًا'
+                : lang === 'en'
+                  ? 'Remind me later'
+                  : 'Rappeler plus tard',
+            action: 'SNOOZE',
+            data: { minutes: 10 },
+          },
+        ],
+      };
+    }
+
+    if (t === 'EMAIL_REQUIRES_RESPONSE') {
+      const subject = payload.subject ?? payload.title ?? null;
+      const from = payload.from ?? payload.sender ?? null;
+      const details = [
+        subject && typeof subject === 'string' ? subject : null,
+        from && typeof from === 'string'
+          ? lang === 'ar'
+            ? `من: ${from}`
+            : lang === 'en'
+              ? `From: ${from}`
+              : `De : ${from}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' — ');
+
+      return {
+        title:
+          lang === 'ar'
+            ? 'رسالة تحتاج ردًا'
+            : lang === 'en'
+              ? 'Email requires a response'
+              : 'Email nécessite une réponse',
+        message:
+          details ||
+          (lang === 'ar'
+            ? 'لديك رسالة تتطلب ردًا.'
+            : lang === 'en'
+              ? 'You have an email that needs a reply.'
+              : 'Vous avez un email qui nécessite une réponse.'),
+        category: 'Work',
+        priority: 'high',
+        actions: [
+          {
+            label:
+              lang === 'ar'
+                ? 'الرد الآن'
+                : lang === 'en'
+                  ? 'Reply now'
+                  : 'Répondre',
+            action: 'REPLY_EMAIL',
+            data: payload.emailId ? { emailId: payload.emailId } : undefined,
+          },
+        ],
+      };
+    }
+
+    if (t === 'TRAFFIC_ALERT') {
+      const route = payload.route ?? payload.destination ?? null;
+      const extra =
+        route && typeof route === 'string'
+          ? route
+          : lang === 'ar'
+            ? 'ازدحام على مسارك.'
+            : lang === 'en'
+              ? 'Heavy traffic on your route.'
+              : 'Trafic dense sur votre trajet.';
+
+      return {
+        title:
+          lang === 'ar'
+            ? 'تنبيه حركة المرور'
+            : lang === 'en'
+              ? 'Traffic alert'
+              : 'Alerte trafic',
+        message: extra,
+        category: 'Travel',
+        priority: 'medium',
+        actions: [
+          {
+            label:
+              lang === 'ar'
+                ? 'عرض المسار'
+                : lang === 'en'
+                  ? 'View route'
+                  : 'Voir le trajet',
+            action: 'OPEN_ROUTE',
+            data: payload,
+          },
+        ],
+      };
+    }
+
+    if (t === 'BREAK_SUGGESTED') {
+      const hours = payload.focusHours ?? payload.hours ?? null;
+      const msg =
+        typeof hours === 'number'
+          ? lang === 'ar'
+            ? `أنت تعمل منذ ${hours} ساعة. خذ استراحة قصيرة.`
+            : lang === 'en'
+              ? `You've been working for ${hours} hours. Consider a short break.`
+              : `Vous travaillez depuis ${hours} heures. Prenez une courte pause.`
+          : lang === 'ar'
+            ? 'اقتراح: خذ استراحة قصيرة.'
+            : lang === 'en'
+              ? 'Suggestion: take a short break.'
+              : 'Suggestion : prenez une courte pause.';
+
+      return {
+        title:
+          lang === 'ar'
+            ? 'استراحة مقترحة'
+            : lang === 'en'
+              ? 'Break suggested'
+              : 'Pause suggérée',
+        message: msg,
+        category: 'Personal',
+        priority: 'low',
+        actions: [
+          {
+            label:
+              lang === 'ar'
+                ? 'ابدأ مؤقتًا'
+                : lang === 'en'
+                  ? 'Start a timer'
+                  : 'Démarrer un minuteur',
+            action: 'START_BREAK_TIMER',
+            data: { minutes: 10 },
+          },
+        ],
+      };
+    }
+
+    if (t === 'WEEKLY_SUMMARY_READY') {
+      return {
+        title:
+          lang === 'ar'
+            ? 'ملخص أسبوعي جاهز'
+            : lang === 'en'
+              ? 'Weekly summary ready'
+              : 'Résumé hebdomadaire prêt',
+        message:
+          lang === 'ar'
+            ? 'إحصاءات الإنتاجية الخاصة بك متاحة الآن.'
+            : lang === 'en'
+              ? 'Your productivity insights are now available.'
+              : 'Vos statistiques de productivité sont disponibles.',
+        category: 'General',
+        priority: 'low',
+        actions: [
+          {
+            label:
+              lang === 'ar'
+                ? 'فتح الملخص'
+                : lang === 'en'
+                  ? 'Open summary'
+                  : 'Ouvrir le résumé',
+            action: 'OPEN_WEEKLY_SUMMARY',
+          },
+        ],
+      };
+    }
+
+    // Unknown signal type: ignore by returning empty strings
+    return {
+      title: '',
+      message: '',
+      category: 'General',
+      priority: 'low',
+      actions: [],
+    };
   }
 
   /**

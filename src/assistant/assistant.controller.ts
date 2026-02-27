@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { AssistantService } from './assistant.service';
 import { CreateContextDto } from './dto/create-context.dto';
 import { AssistantFeedbackDto } from './dto/feedback.dto';
+import { GenerateNotificationsDto } from './dto/generate-notifications.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('assistant')
@@ -97,6 +98,38 @@ export class AssistantController {
       type: dto.type,
     });
     return { ok: true };
+  }
+
+  /**
+   * Assistant / notifications – POST /assistant/notifications
+   *
+   * Body attendu:
+   * {
+   *   "userId": "USER_ID",
+   *   "locale": "fr-TN",
+   *   "timezone": "Africa/Tunis",
+   *   "tone": "professional",
+   *   "maxItems": 5,
+   *   "signals": [
+   *     { "signalType": "MEETING_SOON", "payload": { "title": "...", "startsInMin": 15, "location": "..." } }
+   *   ]
+   * }
+   */
+  @Post('notifications')
+  @UseGuards(OptionalJwtAuthGuard)
+  async notifications(@Body() dto: GenerateNotificationsDto, @Req() req: Request) {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      authUser?.userId ?? authUser?.id ?? authUser?.sub ?? dto.userId;
+
+    const effectiveDto: GenerateNotificationsDto = {
+      ...dto,
+      userId: resolvedUserId,
+    };
+
+    return this.assistantService.generateNotifications(effectiveDto);
   }
 }
 

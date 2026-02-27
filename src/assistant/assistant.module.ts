@@ -26,6 +26,7 @@ import {
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { MlService } from './ml.service';
 import { OpenAiSuggestionClient } from './openai-suggestion.client';
+import { OpenAiNotificationClient } from './openai-notification.client';
 import { Goal, GoalSchema } from '../goals/schemas/goal.schema';
 import { AuthModule } from '../auth/auth.module';
 import {
@@ -54,6 +55,11 @@ import {
     ]),
   ],
   controllers: [AssistantController],
-  providers: [AssistantService, MlService, OpenAiSuggestionClient],
+  providers: [
+    AssistantService,
+    MlService,
+    OpenAiSuggestionClient,
+    OpenAiNotificationClient,
+  ],
 })
 export class AssistantModule {}
