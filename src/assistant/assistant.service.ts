@@ -50,6 +50,10 @@ import {
 } from './schemas/assistant-user-profile.schema';
 import { GenerateNotificationsDto } from './dto/generate-notifications.dto';
 import { randomUUID, createHash } from 'crypto';
+import {
+  AssistantNotification as AssistantNotificationEntity,
+  AssistantNotificationDocument,
+} from './schemas/assistant-notification.schema';
 
 interface GeneratedSuggestion {
   type: SuggestionType;
@@ -83,6 +87,8 @@ export class AssistantService {
     private readonly assistantFeedbackModel: Model<AssistantFeedbackDocument>,
     @InjectModel(AssistantUserProfile.name)
     private readonly assistantUserProfileModel: Model<AssistantUserProfileDocument>,
+    @InjectModel(AssistantNotificationEntity.name)
+    private readonly assistantNotificationModel: Model<AssistantNotificationDocument>,
     private readonly mlService: MlService,
     private readonly openAiSuggestions: OpenAiSuggestionClient,
     private readonly openAiNotifications: OpenAiNotificationClient,
@@ -173,7 +179,7 @@ export class AssistantService {
       )}%). Main categories: ${topCategories}.`;
     }
 
-    const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
+    const learnedPreferences = await this.buildLearnedPreferences(dto.userId!);
 
     const contextForModel = {
       profile,
@@ -261,7 +267,9 @@ export class AssistantService {
     const maxItems = dto.maxItems ?? 5;
     const signals = Array.isArray(dto.signals) ? dto.signals : [];
 
-    const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
+    const learnedPreferences = await this.buildLearnedPreferences(
+      dto.userId as string,
+    );
 
     const ai = await this.openAiNotifications.generateNotifications({
       profile,
@@ -283,7 +291,39 @@ export class AssistantService {
             maxItems,
           });
 
-    return this.dedupeNotifications(base).slice(0, maxItems);
+    const deduped = this.dedupeNotifications(base).slice(0, maxItems);
+
+    const docs = await this.assistantNotificationModel.insertMany(
+      deduped.map((n) => ({
+        userId: dto.userId,
+        title: n.title,
+        message: n.message,
+        category: n.category,
+        priority: n.priority,
+        actions: n.actions,
+        dedupeKey: n.meta.dedupeKey,
+        expiresAt: n.meta.expiresAt ? new Date(n.meta.expiresAt) : null,
+        status: 'unread',
+        source: ai.length > 0 ? 'openai' : 'fallback',
+      })),
+    );
+
+    return docs.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      message: doc.message,
+      category: doc.category,
+      priority: doc.priority,
+      actions: doc.actions.map((a) => ({
+        label: a.label,
+        action: a.action,
+        data: a.data ?? undefined,
+      })),
+      meta: {
+        dedupeKey: doc.dedupeKey,
+        expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : undefined,
+      },
+    }));
   }
 
   private async buildLearnedPreferences(userId: string): Promise<string | null> {
@@ -355,6 +395,52 @@ export class AssistantService {
     }
 
     return parts.length ? parts.join(' ') : null;
+  }
+
+  async listNotificationsForUser(
+    userId: string,
+  ): Promise<AssistantNotification[]> {
+    const docs = await this.assistantNotificationModel
+      .find({ userId, status: { $ne: 'deleted' } })
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return docs.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      message: doc.message,
+      category: doc.category,
+      priority: doc.priority,
+      actions: doc.actions.map((a) => ({
+        label: a.label,
+        action: a.action,
+        data: a.data ?? undefined,
+      })),
+      meta: {
+        dedupeKey: doc.dedupeKey,
+        expiresAt: doc.expiresAt ? doc.expiresAt.toISOString() : undefined,
+      },
+    }));
+  }
+
+  async deleteNotificationForUser(
+    userId: string,
+    notificationId: string,
+  ): Promise<void> {
+    const doc = await this.assistantNotificationModel
+      .findOne({ _id: notificationId, userId })
+      .exec();
+
+    if (!doc) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    if (doc.status === 'deleted') {
+      return;
+    }
+
+    doc.status = 'deleted';
+    await doc.save();
   }
 
   private dedupeNotifications(

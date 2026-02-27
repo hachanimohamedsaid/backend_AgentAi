@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
   Req,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { AssistantService } from './assistant.service';
@@ -124,12 +126,64 @@ export class AssistantController {
     const resolvedUserId =
       authUser?.userId ?? authUser?.id ?? authUser?.sub ?? dto.userId;
 
+    if (!resolvedUserId) {
+      throw new BadRequestException(
+        'userId is required (via JWT or in request body).',
+      );
+    }
+
     const effectiveDto: GenerateNotificationsDto = {
       ...dto,
       userId: resolvedUserId,
     };
 
     return this.assistantService.generateNotifications(effectiveDto);
+  }
+
+  /**
+   * Lister les notifications enregistrées pour l'utilisateur courant.
+   */
+  @Get('notifications')
+  @UseGuards(OptionalJwtAuthGuard)
+  async listNotifications(@Req() req: Request) {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      authUser?.userId ?? authUser?.id ?? authUser?.sub ?? null;
+
+    if (!resolvedUserId) {
+      return [];
+    }
+
+    return this.assistantService.listNotificationsForUser(resolvedUserId);
+  }
+
+  /**
+   * Supprimer (soft delete) une notification de l'utilisateur.
+   */
+  @Delete('notifications/:id')
+  @UseGuards(OptionalJwtAuthGuard)
+  async deleteNotification(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ): Promise<{ ok: true }> {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      authUser?.userId ?? authUser?.id ?? authUser?.sub ?? null;
+
+    if (!resolvedUserId) {
+      // Si pas d'utilisateur résolu, on ignore silencieusement.
+      return { ok: true };
+    }
+
+    await this.assistantService.deleteNotificationForUser(
+      resolvedUserId,
+      id.trim(),
+    );
+    return { ok: true };
   }
 }
 

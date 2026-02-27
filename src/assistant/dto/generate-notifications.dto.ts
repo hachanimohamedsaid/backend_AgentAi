@@ -67,9 +67,10 @@ export class AssistantSignalDto {
 }
 
 export class GenerateNotificationsDto {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  userId: string;
+  userId?: string;
 
   /** e.g. fr-TN, fr-FR, en-US, ar-TN */
   @IsOptional()
