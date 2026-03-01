@@ -13,6 +13,7 @@ import { GoalsModule } from './goals/goals.module';
 import { AdvisorModule } from './advisor/advisor.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MlModule } from './ml/ml.module';
+import { MeetingModule } from './meeting/meeting.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { MlModule } from './ml/ml.module';
     AdvisorModule,
     AssistantModule,
     MlModule,
+    MeetingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
