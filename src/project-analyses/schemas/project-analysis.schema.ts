@@ -32,4 +32,5 @@ export class ProjectAnalysis {
   updatedAt?: Date;
 }
 
-export const ProjectAnalysisSchema = SchemaFactory.createForClass(ProjectAnalysis);
+export const ProjectAnalysisSchema =
+  SchemaFactory.createForClass(ProjectAnalysis);

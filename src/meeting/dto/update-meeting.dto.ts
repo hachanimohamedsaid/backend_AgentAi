@@ -1,65 +1,87 @@
 import {
   IsString,
   IsOptional,
-  IsDateString,
   IsNumber,
-  IsArray,
+  IsIn,
+  IsISO8601,
   Min,
-  ValidateNested,
+  Max,
+  MaxLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { TranscriptChunkDto } from './create-meeting.dto';
 
+/**
+ * DTO for PUT /meeting/:id — partial update of meeting form data (all fields optional).
+ */
 export class UpdateMeetingDto {
   @IsOptional()
   @IsString()
-  title?: string;
+  @MaxLength(200)
+  investorName?: string;
 
   @IsOptional()
   @IsString()
-  roomId?: string;
+  @MaxLength(200)
+  investorCompany?: string | null;
 
   @IsOptional()
-  @IsDateString()
-  startTime?: string;
+  @IsString()
+  @MaxLength(100)
+  country?: string;
 
   @IsOptional()
-  @IsDateString()
-  endTime?: string;
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  meetingAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  dealType?: string | null;
+
+  @IsOptional()
+  @IsIn(['Formal', 'Lunch', 'Dinner', 'Video Call'])
+  meetingType?: 'Formal' | 'Lunch' | 'Dinner' | 'Video Call' | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sector?: string | null;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
-  @Type(() => Number)
-  duration?: number;
+  valuation?: number | null;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  participants?: string[];
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  equity?: number | null;
 
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TranscriptChunkDto)
-  transcript?: TranscriptChunkDto[];
+  @IsNumber()
+  @Min(0)
+  investmentAsked?: number | null;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  keyPoints?: string[];
+  @IsNumber()
+  @Min(0)
+  revenue?: number | null;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  actionItems?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  decisions?: string[];
+  @IsNumber()
+  @Min(0)
+  teamSize?: number | null;
 
   @IsOptional()
   @IsString()
-  summary?: string;
+  investorBio?: string | null;
+
+  @IsOptional()
+  @IsString()
+  investorPosts?: string | null;
 }

@@ -26,10 +26,11 @@ export class AiService {
 
     const openai = new OpenAI({ apiKey });
 
-    const clientMessages: OpenAI.Chat.ChatCompletionMessageParam[] = messages.map((m) => ({
-      role: m.role as 'system' | 'user' | 'assistant',
-      content: m.content,
-    }));
+    const clientMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
+      messages.map((m) => ({
+        role: m.role as 'system' | 'user' | 'assistant',
+        content: m.content,
+      }));
 
     const systemParts: string[] = [];
 
@@ -40,15 +41,14 @@ export class AiService {
         `L'utilisateur connecté est : prénom/nom = ${name}, email = ${email}.`,
         "Quand l'utilisateur demande son nom, son identité ou « qui je suis », utilise ces informations pour répondre (ex. « Tu t'appelles " +
           name +
-          ". »).",
+          '. »).',
       );
     }
 
     const defaultBuddy =
-      "Tu es Buddy, un assistant vocal amical et utile. Réponds toujours en français. Garde tes réponses courtes et naturelles pour la conversation.";
+      'Tu es Buddy, un assistant vocal amical et utile. Réponds toujours en français. Garde tes réponses courtes et naturelles pour la conversation.';
     const hasSystemFromClient = clientMessages.some((m) => m.role === 'system');
-    const userContextStr =
-      systemParts.length > 0 ? systemParts.join(' ') : '';
+    const userContextStr = systemParts.length > 0 ? systemParts.join(' ') : '';
 
     const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
     if (userContextStr) {
@@ -66,15 +66,22 @@ export class AiService {
       });
 
       const content = completion.choices[0]?.message?.content?.trim();
-      return { message: content ?? "Je ne suis pas sûr de comprendre. Réessaie ?" };
+      return {
+        message: content ?? 'Je ne suis pas sûr de comprendre. Réessaie ?',
+      };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'OpenAI request failed';
       console.error('[AiService] OpenAI error:', msg);
-      return { message: "Désolé, je n'ai pas pu traiter ta demande. Réessaie plus tard." };
+      return {
+        message:
+          "Désolé, je n'ai pas pu traiter ta demande. Réessaie plus tard.",
+      };
     }
   }
 
-  private getFallbackResponse(messages: { role: string; content: string }[]): ChatResponse {
+  private getFallbackResponse(
+    messages: { role: string; content: string }[],
+  ): ChatResponse {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     const userText = lastUser?.content?.trim() ?? '';
 

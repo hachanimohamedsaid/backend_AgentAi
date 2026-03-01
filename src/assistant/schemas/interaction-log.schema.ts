@@ -29,4 +29,3 @@ export const InteractionLogSchema =
   SchemaFactory.createForClass(InteractionLog);
 
 InteractionLogSchema.index({ userId: 1, suggestionType: 1, createdAt: -1 });
-

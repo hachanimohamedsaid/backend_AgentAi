@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { HttpService } from '@nestjs/axios';
@@ -54,7 +50,9 @@ export class AdvisorService {
           : err.message || 'Analysis failed';
       throw new HttpException(
         message,
-        status >= 500 ? HttpStatus.BAD_GATEWAY : HttpStatus.INTERNAL_SERVER_ERROR,
+        status >= 500
+          ? HttpStatus.BAD_GATEWAY
+          : HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
