@@ -1,16 +1,9 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AssistantService } from './assistant.service';
 import { CreateContextDto } from './dto/create-context.dto';
 import { AssistantFeedbackDto } from './dto/feedback.dto';
+import { GenerateNotificationsDto } from './dto/generate-notifications.dto';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @Controller('assistant')
@@ -35,7 +28,10 @@ export class AssistantController {
    */
   @Post('context')
   @UseGuards(OptionalJwtAuthGuard)
-  async handleContext(@Body() dto: CreateContextDto, @Req() req: Request) {
+  async handleContext(
+    @Body() dto: CreateContextDto,
+    @Req() req: Request,
+  ) {
     const authUser = (req as any).user as
       | { sub?: string; id?: string; userId?: string }
       | undefined;
@@ -57,7 +53,7 @@ export class AssistantController {
       await this.assistantService.generateAndStoreAvaSuggestions(effectiveDto);
 
     return avaSuggestionDocs.slice(0, 3).map((s) => {
-      const obj = s.toJSON ? s.toJSON() : (s as any);
+      const obj = s.toJSON ? (s.toJSON() as any) : (s as any);
       return {
         id: obj.id ?? obj._id?.toString(),
         type: s.type,
@@ -95,4 +91,28 @@ export class AssistantController {
     });
     return { ok: true };
   }
+
+  /**
+   * Assistant / notifications – POST /assistant/notifications
+   *
+   * Génère une liste de notifications via OpenAI à partir de signaux normalisés.
+   * Ne persiste pas les notifications en base : elles sont uniquement renvoyées au frontend.
+   */
+  @Post('notifications')
+  @UseGuards(OptionalJwtAuthGuard)
+  async notifications(@Body() dto: GenerateNotificationsDto, @Req() req: Request) {
+    const authUser = (req as any).user as
+      | { sub?: string; id?: string; userId?: string }
+      | undefined;
+    const resolvedUserId =
+      authUser?.userId ?? authUser?.id ?? authUser?.sub ?? dto.userId;
+
+    const effectiveDto: GenerateNotificationsDto = {
+      ...dto,
+      userId: resolvedUserId,
+    };
+
+    return this.assistantService.generateNotifications(effectiveDto);
+  }
 }
+

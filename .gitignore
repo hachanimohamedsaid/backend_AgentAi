@@ -46,9 +46,6 @@ lerna-debug.log*
 .temp
 .tmp
 
-# Meeting uploads (user documents)
-uploads/
-
 # Runtime data
 pids
 *.pid

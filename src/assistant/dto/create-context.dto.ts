@@ -49,3 +49,4 @@ export class CreateContextDto {
   @Type(() => Number)
   focusHours: number;
 }
+

@@ -27,8 +27,7 @@ import { MeetingModule } from './meeting/meeting.module';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
         const uri =
-          configService.get<string>('MONGO_URI') ??
-          configService.get<string>('MONGODB_URI');
+          configService.get<string>('MONGO_URI') ?? configService.get<string>('MONGODB_URI');
         if (!uri) {
           throw new Error(
             'MONGO_URI or MONGODB_URI is not defined. Set it in .env or in your deployment environment (e.g. Railway).',
@@ -38,13 +37,9 @@ import { MeetingModule } from './meeting/meeting.module';
           uri,
           serverSelectionTimeoutMS: 15000,
           connectTimeoutMS: 15000,
-          connectionFactory: (connection: {
-            on: (ev: string, fn: () => void) => void;
-          }) => {
+          connectionFactory: (connection: { on: (ev: string, fn: () => void) => void }) => {
             connection.on('connected', () => {
-              console.log(
-                '[Mongoose] Successfully connected to MongoDB Atlas.',
-              );
+              console.log('[Mongoose] Successfully connected to MongoDB Atlas.');
             });
             connection.on('error', () => {
               console.error('[Mongoose] MongoDB connection error.');

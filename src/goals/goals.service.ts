@@ -78,7 +78,9 @@ export class GoalsService {
   }
 
   async update(userId: string, id: string, dto: UpdateGoalDto) {
-    const goal = await this.goalModel.findOne({ _id: id, userId }).exec();
+    const goal = await this.goalModel
+      .findOne({ _id: id, userId })
+      .exec();
     if (!goal) {
       throw new NotFoundException('Goal not found');
     }
@@ -97,7 +99,9 @@ export class GoalsService {
     actionId: string,
     completed: boolean,
   ) {
-    const goal = await this.goalModel.findOne({ _id: goalId, userId }).exec();
+    const goal = await this.goalModel
+      .findOne({ _id: goalId, userId })
+      .exec();
     if (!goal) {
       throw new NotFoundException('Goal not found');
     }

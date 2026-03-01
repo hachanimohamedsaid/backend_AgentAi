@@ -67,3 +67,4 @@ SuggestionSchema.set('toJSON', {
     return ret;
   },
 });
+

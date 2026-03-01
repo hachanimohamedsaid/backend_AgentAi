@@ -44,11 +44,11 @@ describe('App (e2e)', () => {
     });
 
     it('GET /users – list users', async () => {
-      const res = await request(app.getHttpServer()).get('/users').expect(200);
+      const res = await request(app.getHttpServer())
+        .get('/users')
+        .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
-      const jane = res.body.find(
-        (u: { email: string }) => u.email === 'jane@example.com',
-      );
+      const jane = res.body.find((u: { email: string }) => u.email === 'jane@example.com');
       expect(jane).toBeDefined();
       expect(jane).toMatchObject({ name: 'Jane', email: 'jane@example.com' });
     });

@@ -45,9 +45,7 @@ export class UsersService {
       .exec();
   }
 
-  async findByEmailVerificationToken(
-    token: string,
-  ): Promise<UserDocument | null> {
+  async findByEmailVerificationToken(token: string): Promise<UserDocument | null> {
     return this.userModel
       .findOne({
         emailVerificationToken: token,
@@ -103,13 +101,16 @@ export class UsersService {
     if (dto.location !== undefined) (user as any).location = dto.location;
     if (dto.phone !== undefined) (user as any).phone = dto.phone;
     if (dto.birthDate !== undefined) {
-      (user as any).birthDate = dto.birthDate ? new Date(dto.birthDate) : null;
+      (user as any).birthDate = dto.birthDate
+        ? new Date(dto.birthDate)
+        : null;
     }
     if (dto.bio !== undefined) (user as any).bio = dto.bio;
     if (dto.avatarUrl !== undefined) (user as any).avatarUrl = dto.avatarUrl;
     if (dto.conversationsCount !== undefined)
       (user as any).conversationsCount = dto.conversationsCount;
-    if (dto.hoursSaved !== undefined) (user as any).hoursSaved = dto.hoursSaved;
+    if (dto.hoursSaved !== undefined)
+      (user as any).hoursSaved = dto.hoursSaved;
     return user.save();
   }
 }

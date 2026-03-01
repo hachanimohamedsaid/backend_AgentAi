@@ -96,14 +96,15 @@ Each "message" MUST be a single, professional question ending with "?".`.trim();
           const confRaw =
             typeof item.confidence === 'number' ? item.confidence : 0.7;
           const confidence = Math.min(1, Math.max(0, confRaw));
-          const type = typeof item.type === 'string' ? item.type : 'other';
+          const type =
+            typeof item.type === 'string' ? item.type : 'other';
           return { type, message: msg, confidence };
         })
         .filter((v): v is AvaSuggestion => v !== null);
     } catch (err: unknown) {
       const msg =
         err instanceof Error ? err.message : 'OpenAI suggestion request failed';
-
+      // eslint-disable-next-line no-console
       console.error('[OpenAiSuggestionClient] Error:', msg);
       return [];
     }
@@ -116,13 +117,10 @@ Each "message" MUST be a single, professional question ending with "?".`.trim();
     }
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    if (
-      firstBracket !== -1 &&
-      lastBracket !== -1 &&
-      lastBracket > firstBracket
-    ) {
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
       return text.slice(firstBracket, lastBracket + 1);
     }
     return text;
   }
 }
+

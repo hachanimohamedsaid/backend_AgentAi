@@ -30,5 +30,4 @@ export class ProjectDecision {
   updatedAt?: Date;
 }
 
-export const ProjectDecisionSchema =
-  SchemaFactory.createForClass(ProjectDecision);
+export const ProjectDecisionSchema = SchemaFactory.createForClass(ProjectDecision);

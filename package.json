@@ -45,8 +45,6 @@
     "openai": "^6.17.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "pdf-parse": "^2.4.5",
-    "pdfkit": "^0.17.2",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.9.1",
     "rxjs": "^7.8.1",

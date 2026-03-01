@@ -35,10 +35,7 @@ export class MlService {
       this.configService.get<string>('ML_SERVICE_URL') ||
       process.env.ML_SERVICE_URL;
     if (url) {
-      return url
-        .replace(/\/predict\/?$/i, '')
-        .replace(/\/retrain\/?.*$/i, '')
-        .replace(/\/?$/, '');
+      return url.replace(/\/predict\/?$/i, '').replace(/\/retrain\/?.*$/i, '').replace(/\/?$/, '');
     }
     return process.env.NODE_ENV === 'production'
       ? 'https://incredible-determination-production-a7c3.up.railway.app'
@@ -53,7 +50,9 @@ export class MlService {
     return `${this.getBaseUrl()}/retrain/${encodeURIComponent(userId)}`;
   }
 
-  async predict(context: MlPredictContext): Promise<MlSuggestionItem[]> {
+  async predict(
+    context: MlPredictContext,
+  ): Promise<MlSuggestionItem[]> {
     const endpoint = this.getPredictEndpoint();
     try {
       const response = await firstValueFrom(
@@ -75,9 +74,7 @@ export class MlService {
       );
       const suggestions = response.data?.suggestions;
       if (!Array.isArray(suggestions)) {
-        throw new Error(
-          'Invalid ML response: missing or invalid suggestions array',
-        );
+        throw new Error('Invalid ML response: missing or invalid suggestions array');
       }
       return suggestions;
     } catch (err: any) {

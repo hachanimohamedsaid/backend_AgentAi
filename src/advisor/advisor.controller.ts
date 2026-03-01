@@ -21,7 +21,9 @@ export class AdvisorController {
 
   @Get('history')
   @UseGuards(OptionalJwtAuthGuard)
-  async getHistory(@CurrentUser() user: UserDocument | undefined) {
+  async getHistory(
+    @CurrentUser() user: UserDocument | undefined,
+  ) {
     const userId = user ? (user as any)._id?.toString() : undefined;
     const analyses = await this.advisorService.getHistory(userId);
     return { analyses };

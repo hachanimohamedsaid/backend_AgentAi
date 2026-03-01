@@ -48,22 +48,15 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-  ): Promise<{ message: string }> {
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     await this.authService.resetPassword(dto.email);
-    return {
-      message:
-        'If this email is registered, you will receive reset instructions.',
-    };
+    return { message: 'If this email is registered, you will receive reset instructions.' };
   }
 
   /** Définir le nouveau mot de passe après clic sur le lien reçu par email (token dans le lien). */
   @Post('reset-password/confirm')
   @HttpCode(HttpStatus.OK)
-  async setNewPassword(
-    @Body() dto: SetNewPasswordDto,
-  ): Promise<{ message: string }> {
+  async setNewPassword(@Body() dto: SetNewPasswordDto): Promise<{ message: string }> {
     await this.authService.setNewPassword(dto.token, dto.newPassword);
     return { message: 'Password has been reset. You can now sign in.' };
   }
@@ -77,18 +70,13 @@ export class AuthController {
   ): Promise<{ message: string }> {
     const userId = (user as any)._id?.toString();
     await this.authService.sendVerificationEmailForCurrentUser(userId);
-    return {
-      message:
-        'If your email is not yet verified, you will receive a verification link.',
-    };
+    return { message: 'If your email is not yet verified, you will receive a verification link.' };
   }
 
   /** Confirmation du token reçu par email (lien cliqué). Met emailVerified à true. */
   @Post('verify-email/confirm')
   @HttpCode(HttpStatus.OK)
-  async confirmEmailVerification(
-    @Body() dto: VerifyEmailDto,
-  ): Promise<{ message: string }> {
+  async confirmEmailVerification(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
     await this.authService.verifyEmail(dto.token);
     return { message: 'Email verified successfully.' };
   }
@@ -120,7 +108,9 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async me(@CurrentUser() user: UserDocument): Promise<{
+  async me(
+    @CurrentUser() user: UserDocument,
+  ): Promise<{
     id: string;
     name: string;
     email: string;
@@ -147,17 +137,14 @@ export class AuthController {
     const bio = obj.bio ?? (user as any).bio ?? null;
     const avatarUrl = obj.avatarUrl ?? (user as any).avatarUrl ?? null;
     const createdAt = user.createdAt ?? (user as any).createdAt;
-    const conversationsCount =
-      obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
+    const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
     const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
-    const emailVerified =
-      obj.emailVerified ?? (user as any).emailVerified ?? false;
+    const emailVerified = obj.emailVerified ?? (user as any).emailVerified ?? false;
     const daysActive = createdAt
       ? Math.max(
           0,
           Math.floor(
-            (Date.now() - new Date(createdAt).getTime()) /
-              (24 * 60 * 60 * 1000),
+            (Date.now() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000),
           ),
         )
       : 0;
@@ -169,9 +156,7 @@ export class AuthController {
       role,
       location,
       phone,
-      birthDate: birthDate
-        ? new Date(birthDate).toISOString().slice(0, 10)
-        : null,
+      birthDate: birthDate ? new Date(birthDate).toISOString().slice(0, 10) : null,
       bio,
       avatarUrl,
       createdAt: createdAt ? new Date(createdAt).toISOString() : null,

@@ -35,7 +35,10 @@ export class GoalsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@CurrentUser() user: UserDocument, @Body() dto: CreateGoalDto) {
+  async create(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: CreateGoalDto,
+  ) {
     const userId = (user as any)._id?.toString();
     return this.goalsService.create(userId, dto);
   }
@@ -58,6 +61,11 @@ export class GoalsController {
     @Body() dto: ToggleActionDto,
   ) {
     const userId = (user as any)._id?.toString();
-    return this.goalsService.toggleAction(userId, id, actionId, dto.completed);
+    return this.goalsService.toggleAction(
+      userId,
+      id,
+      actionId,
+      dto.completed,
+    );
   }
 }

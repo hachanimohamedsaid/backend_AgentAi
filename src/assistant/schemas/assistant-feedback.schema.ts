@@ -27,3 +27,4 @@ export class AssistantFeedback {
 
 export const AssistantFeedbackSchema =
   SchemaFactory.createForClass(AssistantFeedback);
+

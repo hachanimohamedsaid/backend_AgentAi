@@ -42,11 +42,7 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  private toUserPayload(doc: UserDocument): {
-    id: string;
-    name: string;
-    email: string;
-  } {
+  private toUserPayload(doc: UserDocument): { id: string; name: string; email: string } {
     const id = (doc as any)._id?.toString?.() ?? '';
     return {
       id,
@@ -55,10 +51,7 @@ export class AuthService {
     };
   }
 
-  private async signToken(payload: {
-    sub: string;
-    email: string;
-  }): Promise<string> {
+  private async signToken(payload: { sub: string; email: string }): Promise<string> {
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
     return this.jwtService.signAsync(payload, {
       expiresIn: expiresIn as any,
@@ -100,9 +93,7 @@ export class AuthService {
   ): Promise<void> {
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.error(
-        '[Resend] RESEND_API_KEY is not set – verification email not sent',
-      );
+      console.error('[Resend] RESEND_API_KEY is not set – verification email not sent');
       throw new ServiceUnavailableException(
         'Email service is not configured. Set RESEND_API_KEY on the server.',
       );
@@ -125,11 +116,7 @@ export class AuthService {
       });
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
-      console.error(
-        '[Resend] Verification email failed:',
-        msg,
-        err?.response?.data ?? '',
-      );
+      console.error('[Resend] Verification email failed:', msg, err?.response?.data ?? '');
       throw new ServiceUnavailableException(
         'Could not send verification email. Try again later or check your email configuration (Resend domain, API key).',
       );
@@ -204,25 +191,19 @@ export class AuthService {
       return;
     }
     const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(
-      Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
-    );
+    const expires = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
     (user as any).resetPasswordToken = token;
     (user as any).resetPasswordExpires = expires;
     await user.save();
 
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.error(
-        '[Resend] RESEND_API_KEY is not set – reset email not sent',
-      );
+      console.error('[Resend] RESEND_API_KEY is not set – reset email not sent');
       return; // reset-password is often "silent" (no leak of email existence), so we don't throw
     }
-    const emailFrom =
-      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const emailFrom = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const frontendResetUrl =
-      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ??
-      'https://yourapp.com/reset-password/confirm';
+      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ?? 'https://yourapp.com/reset-password/confirm';
     const resetLink = `${frontendResetUrl.replace(/\/$/, '')}?token=${token}`;
 
     const resend = new Resend(resendApiKey);
@@ -236,11 +217,7 @@ export class AuthService {
       });
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
-      console.error(
-        '[Resend] Reset email failed:',
-        msg,
-        err?.response?.data ?? '',
-      );
+      console.error('[Resend] Reset email failed:', msg, err?.response?.data ?? '');
       // Don't throw for reset (same as before: avoid leaking whether email exists)
     }
   }
@@ -289,10 +266,7 @@ export class AuthService {
     if (!user) {
       user = await this.usersService.findByEmail(email);
       if (user) {
-        await this.usersService.linkGoogleId(
-          (user as any)._id.toString(),
-          googleId,
-        );
+        await this.usersService.linkGoogleId((user as any)._id.toString(), googleId);
       } else {
         user = await this.usersService.createFromGoogle({
           email,
@@ -313,10 +287,7 @@ export class AuthService {
     };
   }
 
-  private getAppleSigningKey = (
-    header: jwt.JwtHeader,
-    callback: jwt.SigningKeyCallback,
-  ) => {
+  private getAppleSigningKey = (header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) => {
     if (!header.kid) return callback(new Error('No kid in header'));
     this.appleJwks.getSigningKey(header.kid, (err, key) => {
       if (err) return callback(err);
@@ -330,8 +301,7 @@ export class AuthService {
       const decoded = jwt.verify(dto.identityToken, this.getAppleSigningKey, {
         algorithms: ['RS256'],
         issuer: 'https://appleid.apple.com',
-        audience:
-          this.configService.get<string>('APPLE_CLIENT_ID') ?? undefined,
+        audience: this.configService.get<string>('APPLE_CLIENT_ID') ?? undefined,
       }) as unknown as { sub: string; email?: string };
       const appleId = decoded.sub;
       let email = decoded.email?.toLowerCase();
@@ -339,10 +309,7 @@ export class AuthService {
 
       if (dto.user) {
         try {
-          const appleUser = JSON.parse(dto.user) as {
-            name?: { firstName?: string; lastName?: string };
-            email?: string;
-          };
+          const appleUser = JSON.parse(dto.user) as { name?: { firstName?: string; lastName?: string }; email?: string };
           if (appleUser.name) {
             const first = appleUser.name.firstName ?? '';
             const last = appleUser.name.lastName ?? '';
