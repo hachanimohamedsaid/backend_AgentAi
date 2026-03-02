@@ -89,6 +89,29 @@ export class MeetingService {
     }));
     meeting.transcript = meeting.transcript ?? [];
     meeting.transcript.push(...chunks);
+
+    // Optional metadata updates (sent by client on end-call).
+    if (dto.title !== undefined) {
+      const t = dto.title.trim();
+      if (t) (meeting as any).title = t;
+    }
+    if (dto.endTime !== undefined) {
+      (meeting as any).endTime = dto.endTime ? new Date(dto.endTime) : undefined;
+    }
+    if (dto.duration !== undefined) {
+      (meeting as any).duration = Math.max(0, Number(dto.duration) || 0);
+    }
+    if (dto.participants !== undefined) {
+      const incoming = (dto.participants ?? [])
+        .map((p) => (p ?? '').trim())
+        .filter((p) => p.length > 0);
+      const existing = Array.isArray((meeting as any).participants)
+        ? ((meeting as any).participants as string[])
+        : [];
+      const merged = Array.from(new Set([...existing, ...incoming]));
+      (meeting as any).participants = merged;
+    }
+
     await meeting.save();
     return meeting.toJSON() as MeetingDocument;
   }
