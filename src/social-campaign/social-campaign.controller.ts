@@ -8,6 +8,7 @@ import {
 import { SocialCampaignService } from './social-campaign.service';
 import { CampaignBriefDto } from './dto/campaign-brief.dto';
 import { SendCampaignDto } from './dto/send-campaign.dto';
+import { UpdateCampaignResultDto } from './dto/update-campaign-result.dto';
 
 @Controller('social-campaign')
 export class SocialCampaignController {
@@ -32,6 +33,19 @@ export class SocialCampaignController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.socialCampaignService.findOne(id);
+  }
+
+  /**
+   * POST /social-campaign/:id/result
+   * Called by N8N (or any external system) to write the generated campaign
+   * content back into MongoDB and update the status to "completed" | "failed".
+   */
+  @Post(':id/result')
+  async updateResult(
+    @Param('id') id: string,
+    @Body() dto: UpdateCampaignResultDto,
+  ) {
+    return this.socialCampaignService.updateResult(id, dto);
   }
 
   /**

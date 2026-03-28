@@ -13,6 +13,7 @@ import { firstValueFrom } from 'rxjs';
 import { Campaign, CampaignDocument, CampaignStatus } from './campaign.schema';
 import { CampaignBriefDto } from './dto/campaign-brief.dto';
 import { SendCampaignDto } from './dto/send-campaign.dto';
+import { UpdateCampaignResultDto } from './dto/update-campaign-result.dto';
 
 const N8N_TIMEOUT_MS = 120_000;
 const EMAIL_TIMEOUT_MS = 30_000;
@@ -143,6 +144,33 @@ export class SocialCampaignService {
     if (!doc) {
       throw new NotFoundException(`Campaign ${id} not found`);
     }
+    return this.toPlain(doc);
+  }
+
+  // ─── POST /social-campaign/:id/result ───────────────────────────────────────
+
+  async updateResult(id: string, dto: UpdateCampaignResultDto): Promise<any> {
+    if (!this.isValidObjectId(id)) {
+      throw new BadRequestException('Invalid campaign id');
+    }
+
+    const doc = await this.campaignModel
+      .findByIdAndUpdate(
+        id,
+        { campaignResult: dto.campaignResult, status: dto.status },
+        { new: true },
+      )
+      .lean()
+      .exec();
+
+    if (!doc) {
+      throw new NotFoundException(`Campaign ${id} not found`);
+    }
+
+    this.logger.log(
+      `Campaign [${id}] result updated — status: ${dto.status}`,
+    );
+
     return this.toPlain(doc);
   }
 
