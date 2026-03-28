@@ -42,7 +42,7 @@ export class Campaign {
   @Prop({ type: [String], default: [] })
   sentTo: string[];
 
-  @Prop({ required: false, default: null })
+  @Prop({ type: Date, default: null })
   sentAt: Date | null;
 
   createdAt?: Date;
