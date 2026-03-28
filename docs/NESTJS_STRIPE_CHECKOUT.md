@@ -28,7 +28,7 @@ Exemple de redirection côté backend :
 
 ```ts
 // controller Stripe redirect
-@Get('stripe/success')
+@Get('billing/success')
 success(@Query('plan') plan: string) {
   return `<!DOCTYPE html><html><body><script>window.location.href = 'piagent:///subscription/success?plan=${encodeURIComponent(plan)}'</script></body></html>`;
 }
@@ -47,9 +47,9 @@ success(@Query('plan') plan: string) {
 
 ## 4. Exemples de configuration
 
-`STRIPE_SUCCESS_URL=https://ton-domaine.com/stripe/success?plan={PLAN}`
+`STRIPE_SUCCESS_URL=https://ton-domaine.com/billing/success?plan={PLAN}`
 
-`STRIPE_CANCEL_URL=https://ton-domaine.com/stripe/cancel`
+`STRIPE_CANCEL_URL=https://ton-domaine.com/billing/cancel`
 
 ## 5. À documenter côté backend
 
