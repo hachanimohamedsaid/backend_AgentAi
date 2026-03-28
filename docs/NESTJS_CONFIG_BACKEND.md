@@ -39,7 +39,37 @@ RESEND_API_KEY=re_xxxxxxxxxxxx
 EMAIL_FROM=onboarding@resend.dev
 FRONTEND_RESET_PASSWORD_URL=https://ton-app.web.app/reset-password/confirm
 FRONTEND_VERIFY_EMAIL_URL=https://ton-app.web.app/verify-email
+
+# Assistant / suggestions – service ML (backend appelle cette URL uniquement)
+ML_SERVICE_URL=https://incredible-determination-production-a7c3.up.railway.app
+
+# Stripe Checkout – abonnements (backend uniquement)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PRICE_MONTHLY=price_...
+STRIPE_PRICE_YEARLY=price_...
+STRIPE_SUCCESS_URL=https://ton-domaine.com/stripe/success?plan={PLAN}
+STRIPE_CANCEL_URL=https://ton-domaine.com/stripe/cancel
 ```
+
+## 1.1 Stripe Checkout (optionnel)
+
+Si tu utilises les abonnements Stripe, le backend doit exposer l’endpoint :
+
+- `POST /billing/create-checkout-session`
+
+et renvoyer un objet JSON :
+
+```json
+{ "url": "https://checkout.stripe.com/..." }
+```
+
+Contraintes importantes :
+
+- `STRIPE_SUCCESS_URL` et `STRIPE_CANCEL_URL` doivent être des URLs HTTP(S) valides.
+- Stripe n’accepte pas un schéma personnalisé `piagent://...` directement dans `success_url` ou `cancel_url`.
+- Si tu veux revenir dans l’app, utilise une page HTTPS sur ton backend qui redirige ensuite vers `piagent:///subscription/success?plan=...`.
+
+Pour plus de détails et un guide complet sur l’implémentation Stripe Checkout, voir `docs/NESTJS_STRIPE_CHECKOUT.md`.
 
 ---
 
