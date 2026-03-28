@@ -40,11 +40,14 @@ export class BillingService {
       throw new BadRequestException('Stripe price not configured for this plan');
     }
 
-    const successUrl = this.config.get<string>('STRIPE_SUCCESS_URL');
-    const cancelUrl = this.config.get<string>('STRIPE_CANCEL_URL');
-    if (!successUrl || !cancelUrl) {
+    const rawSuccessUrl = this.config.get<string>('STRIPE_SUCCESS_URL');
+    const rawCancelUrl = this.config.get<string>('STRIPE_CANCEL_URL');
+    if (!rawSuccessUrl || !rawCancelUrl) {
       throw new BadRequestException('STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL required');
     }
+
+    const successUrl = this.buildStripeUrl(rawSuccessUrl, plan);
+    const cancelUrl = this.buildStripeUrl(rawCancelUrl, plan);
 
     try {
       const stripe = this.getStripe();
@@ -71,6 +74,21 @@ export class BillingService {
       }
       this.logger.error('Unexpected error creating checkout session', err);
       throw new InternalServerErrorException('Unable to create checkout session');
+    }
+  }
+
+  private buildStripeUrl(rawUrl: string, plan: 'monthly' | 'yearly'): string {
+    const url = rawUrl.replace('{PLAN}', encodeURIComponent(plan));
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error('Invalid protocol');
+      }
+      return url;
+    } catch {
+      throw new BadRequestException(
+        'STRIPE_SUCCESS_URL and STRIPE_CANCEL_URL must be valid HTTP(S) URLs. Example: https://domain.com/stripe/success?plan={PLAN}',
+      );
     }
   }
 }
