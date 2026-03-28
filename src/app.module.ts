@@ -13,7 +13,11 @@ import { GoalsModule } from './goals/goals.module';
 import { AdvisorModule } from './advisor/advisor.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MlModule } from './ml/ml.module';
+<<<<<<< HEAD
 import { MeetingModule } from './meeting/meeting.module';
+=======
+import { BillingModule } from './billing/billing.module';
+>>>>>>> 6cbb72f (strip)
 
 @Module({
   imports: [
@@ -60,7 +64,11 @@ import { MeetingModule } from './meeting/meeting.module';
     AdvisorModule,
     AssistantModule,
     MlModule,
+<<<<<<< HEAD
     MeetingModule,
+=======
+    BillingModule,
+>>>>>>> 6cbb72f (strip)
   ],
   controllers: [AppController],
   providers: [AppService],
