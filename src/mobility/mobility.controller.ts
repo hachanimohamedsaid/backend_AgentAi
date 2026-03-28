@@ -18,6 +18,7 @@ import type { UserDocument } from '../users/schemas/user.schema';
 import { EstimateRideDto } from './dto/estimate-ride.dto';
 import { CreateMobilityRuleDto } from './dto/create-mobility-rule.dto';
 import { UpdateMobilityRuleDto } from './dto/update-mobility-rule.dto';
+import { CreateProposalDto } from './dto/create-proposal.dto';
 import { MobilityQuotesService } from './mobility-quotes.service';
 import { MobilityPricingEngine } from './mobility-pricing.engine';
 import { MobilityApprovalService } from './mobility-approval.service';
@@ -42,7 +43,6 @@ export class MobilityController {
   @Post('quotes/estimate')
   @HttpCode(HttpStatus.OK)
   async estimate(@CurrentUser() user: UserDocument, @Body() dto: EstimateRideDto) {
-    const userId = (user as any)._id?.toString();
     const options = await this.quotesService.estimate({
       from: dto.from,
       to: dto.to,
@@ -50,7 +50,6 @@ export class MobilityController {
     });
     const ranked = this.pricingEngine.rank(options, dto.preferences);
     return {
-      userId,
       best: ranked.best,
       options: ranked.options,
     };
@@ -100,15 +99,32 @@ export class MobilityController {
     return this.approvalService.getPending(userId);
   }
 
-  @Post('proposals/:proposalId/confirm')
-  async confirm(@CurrentUser() user: UserDocument, @Param('proposalId') proposalId: string) {
+  @Post('proposals')
+  @HttpCode(HttpStatus.CREATED)
+  async createProposal(@CurrentUser() user: UserDocument, @Body() dto: CreateProposalDto) {
     const userId = (user as any)._id?.toString();
+    return this.approvalService.createProposal(userId, dto);
+  }
+
+  @Post('proposals/:id/confirm')
+  @Post('proposals/:proposalId/confirm')
+  async confirm(
+    @CurrentUser() user: UserDocument,
+    @Param() params: { id?: string; proposalId?: string },
+  ) {
+    const userId = (user as any)._id?.toString();
+    const proposalId = params.id ?? params.proposalId ?? '';
     return this.approvalService.confirm(userId, proposalId);
   }
 
+  @Post('proposals/:id/reject')
   @Post('proposals/:proposalId/reject')
-  async reject(@CurrentUser() user: UserDocument, @Param('proposalId') proposalId: string) {
+  async reject(
+    @CurrentUser() user: UserDocument,
+    @Param() params: { id?: string; proposalId?: string },
+  ) {
     const userId = (user as any)._id?.toString();
+    const proposalId = params.id ?? params.proposalId ?? '';
     return this.approvalService.reject(userId, proposalId);
   }
 

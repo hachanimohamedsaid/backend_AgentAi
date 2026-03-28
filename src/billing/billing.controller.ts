@@ -23,7 +23,7 @@ import type { UserDocument } from '../users/schemas/user.schema';
 @Controller('billing')
 export class BillingController {
   private readonly logger = new Logger(BillingController.name);
-  private readonly stripe: Stripe;
+  private readonly stripe: Stripe | null;
   private readonly successRedirectScheme: string;
 
   constructor(
@@ -31,10 +31,12 @@ export class BillingController {
     private readonly configService: ConfigService,
   ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    this.stripe = secretKey ? new Stripe(secretKey) : null;
     if (!secretKey) {
-      throw new Error('STRIPE_SECRET_KEY is not defined');
+      this.logger.warn(
+        'STRIPE_SECRET_KEY is not set: /billing/success will skip Stripe session verification.',
+      );
     }
-    this.stripe = new Stripe(secretKey);
     this.successRedirectScheme =
       this.configService.get<string>('STRIPE_SUCCESS_REDIRECT_SCHEME') || 'piagent://';
   }
@@ -64,7 +66,7 @@ export class BillingController {
       throw new BadRequestException('Missing plan parameter');
     }
 
-    if (sessionId) {
+    if (sessionId && this.stripe) {
       try {
         const session = await this.stripe.checkout.sessions.retrieve(sessionId);
         if (session.payment_status !== 'paid') {
@@ -73,6 +75,8 @@ export class BillingController {
       } catch (error) {
         this.logger.warn(`Failed to verify Stripe session: ${String(error)}`);
       }
+    } else if (sessionId && !this.stripe) {
+      this.logger.warn('Skipping Stripe session verification because STRIPE_SECRET_KEY is missing.');
     }
 
     const deepLinkUrl = this.buildDeepLink('billing/success', plan);

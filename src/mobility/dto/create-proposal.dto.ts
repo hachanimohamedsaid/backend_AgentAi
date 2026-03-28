@@ -1,28 +1,11 @@
 import {
-  IsBoolean,
   IsDateString,
   IsNumber,
-  IsInt,
   IsOptional,
   IsString,
-  Max,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
-class EstimatePreferencesDto {
-  @IsOptional()
-  @IsBoolean()
-  cheapestFirst?: boolean;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(120)
-  maxEtaMinutes?: number;
-}
 
 class CoordsDto {
   @Type(() => Number)
@@ -34,7 +17,19 @@ class CoordsDto {
   longitude: number;
 }
 
-export class EstimateRideDto {
+class RouteSnapshotDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  distanceKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  durationMin?: number;
+}
+
+export class CreateProposalDto {
   @IsString()
   from: string;
 
@@ -44,10 +39,16 @@ export class EstimateRideDto {
   @IsDateString()
   pickupAt: string;
 
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => EstimatePreferencesDto)
-  preferences?: EstimatePreferencesDto;
+  @IsString()
+  selectedProvider: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  selectedPrice: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  selectedEtaMinutes: number;
 
   @IsOptional()
   @ValidateNested()
@@ -58,4 +59,9 @@ export class EstimateRideDto {
   @ValidateNested()
   @Type(() => CoordsDto)
   toCoordinates?: CoordsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RouteSnapshotDto)
+  routeSnapshot?: RouteSnapshotDto;
 }

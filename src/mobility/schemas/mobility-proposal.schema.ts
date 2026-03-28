@@ -4,6 +4,24 @@ import { Document } from 'mongoose';
 export type MobilityProposalDocument = MobilityProposal & Document;
 
 @Schema({ _id: false })
+class Coordinates {
+  @Prop({ required: true })
+  latitude: number;
+
+  @Prop({ required: true })
+  longitude: number;
+}
+
+@Schema({ _id: false })
+class RouteSnapshot {
+  @Prop({ type: Number, default: null })
+  distanceKm: number | null;
+
+  @Prop({ type: Number, default: null })
+  durationMin: number | null;
+}
+
+@Schema({ _id: false })
 class ProposalOption {
   @Prop({ required: true })
   provider: string;
@@ -35,8 +53,8 @@ export class MobilityProposal {
   @Prop({ type: String, default: null })
   ruleId: string | null;
 
-  @Prop({ required: true })
-  quoteRunId: string;
+  @Prop({ type: String, default: null })
+  quoteRunId: string | null;
 
   @Prop({ required: true, enum: ['PENDING_USER_APPROVAL', 'CONFIRMED', 'REJECTED', 'FAILED', 'EXPIRED'], default: 'PENDING_USER_APPROVAL', index: true })
   status: 'PENDING_USER_APPROVAL' | 'CONFIRMED' | 'REJECTED' | 'FAILED' | 'EXPIRED';
@@ -55,6 +73,24 @@ export class MobilityProposal {
 
   @Prop({ type: [ProposalOption], default: [] })
   options: ProposalOption[];
+
+  @Prop({ type: String, default: null })
+  selectedProvider: string | null;
+
+  @Prop({ type: Number, default: null })
+  selectedPrice: number | null;
+
+  @Prop({ type: Number, default: null })
+  selectedEtaMinutes: number | null;
+
+  @Prop({ type: Coordinates, default: null })
+  fromCoordinates: Coordinates | null;
+
+  @Prop({ type: Coordinates, default: null })
+  toCoordinates: Coordinates | null;
+
+  @Prop({ type: RouteSnapshot, default: null })
+  routeSnapshot: RouteSnapshot | null;
 
   @Prop({ required: true })
   expiresAt: Date;

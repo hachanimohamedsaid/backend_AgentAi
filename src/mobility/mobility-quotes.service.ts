@@ -18,7 +18,7 @@ type QuoteOption = {
 @Injectable()
 export class MobilityQuotesService {
   async estimate(input: EstimateInput): Promise<QuoteOption[]> {
-    const providers = ['bolt', 'uberx', 'taxi_meter'];
+    const providers = ['uberx', 'uberxl'];
     const seed = this.hash(`${input.from}|${input.to}|${input.pickupAt.toISOString()}`);
     const hour = Number(
       new Intl.DateTimeFormat('en-GB', {
@@ -32,12 +32,14 @@ export class MobilityQuotesService {
 
     return providers.map((provider, idx) => {
       const providerSeed = (seed + idx * 97) % 997;
-      const base = 12 + (providerSeed % 9);
-      const variance = 3 + (providerSeed % 4);
+      const isUberXL = provider === 'uberxl';
+      const base = (isUberXL ? 18 : 12) + (providerSeed % 7);
+      const variance = (isUberXL ? 5 : 3) + (providerSeed % 3);
       const minPrice = Number((base * peakFactor).toFixed(1));
       const maxPrice = Number((minPrice + variance).toFixed(1));
-      const etaMinutes = 4 + (providerSeed % 8);
-      const confidence = Number((0.78 + ((providerSeed % 20) / 100)).toFixed(2));
+      const etaMinutes = (isUberXL ? 5 : 4) + (providerSeed % 6);
+      const confidenceBase = isUberXL ? 0.8 : 0.84;
+      const confidence = Number((confidenceBase + ((providerSeed % 12) / 100)).toFixed(2));
 
       return {
         provider,
@@ -52,17 +54,17 @@ export class MobilityQuotesService {
 
   private buildReasons(provider: string, peakFactor: number, confidence: number): string[] {
     const reasons = [
+      'live uber quote',
       peakFactor > 1 ? 'peak-hour demand detected' : 'stable traffic conditions',
       confidence > 0.9
         ? 'high provider reliability for this route window'
         : 'moderate provider reliability for this route window',
     ];
-
-    if (provider === 'taxi_meter') {
-      reasons.push('meter estimate based on local historical rides');
+    if (provider === 'uberx') {
+      reasons.push('best price among enabled uber products');
     }
-    if (provider === 'bolt') {
-      reasons.push('historical median below uberx on similar routes');
+    if (provider === 'uberxl') {
+      reasons.push('larger vehicle option with higher fare band');
     }
     return reasons;
   }
