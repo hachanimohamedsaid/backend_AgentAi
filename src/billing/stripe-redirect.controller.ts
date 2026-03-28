@@ -1,17 +1,15 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
 
-@Controller()
+@Controller('stripe')
 export class StripeRedirectController {
-  @Get('stripe/success')
-  @Get('billing/success')
+  @Get('success')
   @Header('Content-Type', 'text/html; charset=utf-8')
   success(@Query('plan') plan?: string): string {
     const target = this.buildDeepLink('subscription/success', plan);
     return this.buildHtml(target, 'Paiement réussi, retour à l’application');
   }
 
-  @Get('stripe/cancel')
-  @Get('billing/cancel')
+  @Get('cancel')
   @Header('Content-Type', 'text/html; charset=utf-8')
   cancel(@Query('plan') plan?: string): string {
     const target = this.buildDeepLink('subscription/cancel', plan);
