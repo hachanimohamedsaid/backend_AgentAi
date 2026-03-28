@@ -6,9 +6,7 @@ import { MeetingController } from './meeting.controller';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Meeting.name, schema: MeetingSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Meeting.name, schema: MeetingSchema }]),
   ],
   controllers: [MeetingController],
   providers: [MeetingService],
