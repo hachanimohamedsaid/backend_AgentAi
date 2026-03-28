@@ -17,6 +17,7 @@ import { MlModule } from './ml/ml.module';
 import { MeetingModule } from './meeting/meeting.module';
 import { BillingModule } from './billing/billing.module';
 import { MobilityModule } from './mobility/mobility.module';
+import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { MobilityModule } from './mobility/mobility.module';
     MeetingModule,
     BillingModule,
     MobilityModule,
+    SocialCampaignModule,
   ],
   controllers: [AppController],
   providers: [AppService],
