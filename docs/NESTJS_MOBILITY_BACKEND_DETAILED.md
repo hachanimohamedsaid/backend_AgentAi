@@ -8,6 +8,7 @@ Le backend couvre:
 - regles quotidiennes,
 - creation de propositions,
 - confirmation manuelle avant reservation,
+- suivi in-app des statuts provider (PENDING_PROVIDER -> ACCEPTED/FAILED/EXPIRED),
 - persistence MongoDB.
 
 Important:
@@ -15,6 +16,7 @@ Important:
 - Les donnees sont dynamiques (origine, destination, coords GPS optionnelles).
 - Mode produit actuel: Uber-only en production (`uberx`, `uberxl`).
 - Bolt/Taxi meter restent en roadmap (phase future).
+- Aucune fake data en runtime: estimations et propositions doivent venir du backend live.
 
 ## Contrat frontend couvert
 
@@ -39,6 +41,7 @@ Endpoints JWT:
   - `best`
   - `options[]` avec `provider`, `minPrice`, `maxPrice`, `etaMinutes`, `confidence`, `reasons`.
 - Providers actifs en mode current-prod: `uberx`, `uberxl`.
+- Pas de fallback mock: en indisponibilite provider, retourner `503 PROVIDER_UNAVAILABLE`.
 
 ### `POST /mobility/proposals`
 - Cree une proposition en statut `PENDING_USER_APPROVAL`.
@@ -59,21 +62,30 @@ Endpoints JWT:
 - Chaque item expose au minimum: `id`, `from`, `to`, `status`, `provider`.
 
 ### `POST /mobility/proposals/:id/confirm`
-- Confirme la proposition et cree un booking.
+- Confirme la proposition et cree/maj un booking en `PENDING_PROVIDER`.
+- Ne retourne jamais `ACCEPTED` immediatement.
 - Retourne:
 
 ```json
 {
   "ok": true,
   "proposalId": "proposal_abc",
-  "status": "CONFIRMED",
+  "status": "PENDING_PROVIDER",
   "bookingId": "booking_xyz"
 }
 ```
 
 ### `POST /mobility/proposals/:id/reject`
-- Refuse la proposition.
+- Refuse/annule la proposition.
 - Retourne `200` avec JSON.
+
+### `POST /mobility/providers/uber/webhook`
+- Callback provider pour transitions finales.
+- Evenements supportes:
+  - `DRIVER_ACCEPTED` -> `ACCEPTED`
+  - `DRIVER_NOT_FOUND` -> `REJECTED`
+  - `TIMEOUT` -> `EXPIRED`
+  - `TRIP_FINISHED` -> `COMPLETED`
 
 ## Scheduler et securite
 
@@ -96,12 +108,16 @@ MAPS_API_KEY=...
 TRAFFIC_API_KEY=...
 UBER_CLIENT_ID=...
 UBER_CLIENT_SECRET=...
+UBER_QUOTES_API_URL=...
+UBER_SERVER_TOKEN=...
 BOLT_API_KEY=...
 BOLT_API_SECRET=...
 ```
 
 Notes env en mode actuel:
 - `UBER_CLIENT_ID` / `UBER_CLIENT_SECRET` utiles pour l'integration live OAuth/provider.
+- `UBER_QUOTES_API_URL` requis pour les estimations Uber live.
+- `UBER_SERVER_TOKEN` optionnel selon ton gateway/provider.
 - `BOLT_*` peut rester vide si Bolt est desactive en production.
 
 ## Checklist E2E

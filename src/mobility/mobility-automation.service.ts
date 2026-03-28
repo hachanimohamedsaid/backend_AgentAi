@@ -41,7 +41,15 @@ export class MobilityAutomationService {
       if (!this.isRuleDueNow(rule, new Date())) {
         continue;
       }
-      await this.triggerRule(rule);
+      try {
+        await this.triggerRule(rule);
+      } catch (error) {
+        this.logger.warn(
+          `Rule trigger failed for rule=${String((rule as any)._id)}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
   }
 
@@ -74,7 +82,7 @@ export class MobilityAutomationService {
     );
     const expiresAt = new Date(Date.now() + Math.max(1, ttlMinutes) * 60_000);
 
-    const status = rule.requireUserApproval ? 'PENDING_USER_APPROVAL' : 'CONFIRMED';
+    const status = rule.requireUserApproval ? 'PENDING_USER_APPROVAL' : 'PENDING_PROVIDER';
 
     await this.proposalModel.create({
       userId: rule.userId,

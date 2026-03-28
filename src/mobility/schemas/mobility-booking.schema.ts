@@ -14,8 +14,19 @@ export class MobilityBooking {
   @Prop({ required: true })
   provider: string;
 
-  @Prop({ required: true, enum: ['CONFIRMED', 'FAILED'], default: 'CONFIRMED' })
-  status: 'CONFIRMED' | 'FAILED';
+  @Prop({
+    required: true,
+    enum: ['PENDING_PROVIDER', 'ACCEPTED', 'REJECTED', 'FAILED', 'CANCELED', 'EXPIRED', 'COMPLETED'],
+    default: 'PENDING_PROVIDER',
+  })
+  status:
+    | 'PENDING_PROVIDER'
+    | 'ACCEPTED'
+    | 'REJECTED'
+    | 'FAILED'
+    | 'CANCELED'
+    | 'EXPIRED'
+    | 'COMPLETED';
 
   @Prop({ required: true })
   from: string;
@@ -36,7 +47,10 @@ export class MobilityBooking {
   etaMinutes: number;
 
   @Prop({ type: String, default: null })
-  externalBookingId: string | null;
+  providerBookingRef: string | null;
+
+  @Prop({ type: Object, default: null })
+  providerPayloadLast: Record<string, unknown> | null;
 
   @Prop({ type: String, default: null })
   errorMessage: string | null;

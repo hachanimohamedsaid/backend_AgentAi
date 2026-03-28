@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -63,7 +63,7 @@ export class MobilityApprovalService {
   async getPending(userId: string) {
     await this.expireStaleProposals(userId);
     const proposals = await this.proposalModel
-      .find({ userId, status: 'PENDING_USER_APPROVAL' })
+      .find({ userId, status: { $in: ['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'] } })
       .sort({ createdAt: -1 })
       .limit(50)
       .exec();
@@ -71,22 +71,33 @@ export class MobilityApprovalService {
   }
 
   async confirm(userId: string, proposalId: string) {
-    const proposal = await this.proposalModel
-      .findOne({ _id: proposalId, userId, status: 'PENDING_USER_APPROVAL' })
-      .exec();
+    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
 
     if (!proposal) {
-      throw new NotFoundException('Pending proposal not found');
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Pending proposal not found',
+      });
+    }
+
+    if (proposal.status !== 'PENDING_USER_APPROVAL') {
+      throw new ConflictException({
+        code: 'INVALID_STATE_TRANSITION',
+        message: `Cannot confirm proposal from state ${proposal.status}`,
+      });
     }
 
     if (proposal.expiresAt.getTime() <= Date.now()) {
       proposal.status = 'EXPIRED';
       await proposal.save();
-      throw new NotFoundException('Proposal expired');
+      throw new ConflictException({
+        code: 'PROPOSAL_EXPIRED',
+        message: 'Proposal expired',
+      });
     }
 
-    const booking = await this.bookingService.bookFromProposal(userId, proposal);
-    proposal.status = 'CONFIRMED';
+    const booking = await this.bookingService.createPendingFromProposal(userId, proposal);
+    proposal.status = 'PENDING_PROVIDER';
     proposal.confirmedAt = new Date();
     proposal.bookingId = (booking as any)._id?.toString() ?? null;
     await proposal.save();
@@ -94,29 +105,124 @@ export class MobilityApprovalService {
     return {
       ok: true,
       proposalId: (proposal as any)._id?.toString(),
-      status: proposal.status,
       bookingId: proposal.bookingId,
-      booking,
+      status: proposal.status,
+      message: 'Driver search started',
     };
   }
 
   async reject(userId: string, proposalId: string) {
-    const proposal = await this.proposalModel
-      .findOne({ _id: proposalId, userId, status: 'PENDING_USER_APPROVAL' })
-      .exec();
+    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
 
     if (!proposal) {
-      throw new NotFoundException('Pending proposal not found');
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Pending proposal not found',
+      });
     }
 
-    proposal.status = 'REJECTED';
+    if (!['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'].includes(proposal.status)) {
+      throw new ConflictException({
+        code: 'INVALID_STATE_TRANSITION',
+        message: `Cannot reject proposal from state ${proposal.status}`,
+      });
+    }
+
+    proposal.status = proposal.status === 'PENDING_PROVIDER' ? 'CANCELED' : 'REJECTED';
     proposal.rejectedAt = new Date();
     await proposal.save();
+
+    await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), proposal.status, {
+      errorMessage: proposal.status === 'CANCELED' ? 'Canceled by user' : null,
+    });
 
     return {
       ok: true,
       proposalId: (proposal as any)._id?.toString(),
       status: proposal.status,
+    };
+  }
+
+  async cancel(userId: string, proposalId: string) {
+    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
+
+    if (!proposal) {
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Proposal not found',
+      });
+    }
+
+    if (['ACCEPTED', 'COMPLETED', 'FAILED', 'EXPIRED'].includes(proposal.status)) {
+      throw new ConflictException({
+        code: 'INVALID_STATE_TRANSITION',
+        message: `Cannot cancel proposal from state ${proposal.status}`,
+      });
+    }
+
+    if (proposal.status !== 'CANCELED') {
+      proposal.status = 'CANCELED';
+      proposal.rejectedAt = new Date();
+      await proposal.save();
+    }
+
+    await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), 'CANCELED', {
+      errorMessage: 'Canceled by user',
+    });
+
+    return {
+      ok: true,
+      proposalId: (proposal as any)._id?.toString(),
+      status: proposal.status,
+    };
+  }
+
+  async handleProviderEvent(
+    proposalId: string,
+    eventType: string,
+    payload?: Record<string, unknown>,
+  ) {
+    const proposal = await this.proposalModel.findById(proposalId).exec();
+    if (!proposal) {
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Proposal not found',
+      });
+    }
+
+    const normalized = eventType.toUpperCase();
+    let targetStatus: 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'EXPIRED' | 'COMPLETED';
+
+    if (normalized === 'DRIVER_ACCEPTED') {
+      targetStatus = 'ACCEPTED';
+    } else if (normalized === 'DRIVER_NOT_FOUND' || normalized === 'TIMEOUT') {
+      targetStatus = normalized === 'TIMEOUT' ? 'EXPIRED' : 'REJECTED';
+    } else if (normalized === 'TRIP_FINISHED') {
+      targetStatus = 'COMPLETED';
+    } else {
+      targetStatus = 'FAILED';
+    }
+
+    proposal.status = targetStatus;
+    await proposal.save();
+
+    const booking = await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), targetStatus, {
+      providerBookingRef:
+        typeof payload?.providerBookingRef === 'string'
+          ? payload.providerBookingRef
+          : null,
+      providerPayloadLast: payload ?? null,
+      errorMessage:
+        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
+          ? `Provider event: ${normalized}`
+          : null,
+    });
+
+    return {
+      ok: true,
+      proposalId: (proposal as any)._id.toString(),
+      bookingId: (booking as any)?._id?.toString() ?? null,
+      status: targetStatus,
     };
   }
 
@@ -143,7 +249,7 @@ export class MobilityApprovalService {
       .updateMany(
         {
           userId,
-          status: 'PENDING_USER_APPROVAL',
+          status: { $in: ['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'] },
           expiresAt: { $lte: new Date() },
         },
         { $set: { status: 'EXPIRED' } },

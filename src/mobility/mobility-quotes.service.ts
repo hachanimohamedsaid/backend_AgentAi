@@ -1,9 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 
 type EstimateInput = {
   from: string;
   to: string;
   pickupAt: Date;
+  fromCoordinates?: { latitude: number; longitude: number };
+  toCoordinates?: { latitude: number; longitude: number };
 };
 
 type QuoteOption = {
@@ -17,64 +25,114 @@ type QuoteOption = {
 
 @Injectable()
 export class MobilityQuotesService {
+  private readonly logger = new Logger(MobilityQuotesService.name);
+
+  constructor(private readonly configService: ConfigService) {}
+
   async estimate(input: EstimateInput): Promise<QuoteOption[]> {
-    const providers = ['uberx', 'uberxl'];
-    const seed = this.hash(`${input.from}|${input.to}|${input.pickupAt.toISOString()}`);
-    const hour = Number(
-      new Intl.DateTimeFormat('en-GB', {
-        hour: '2-digit',
-        hour12: false,
-        timeZone: 'UTC',
-      }).format(input.pickupAt),
-    );
+    const endpoint = this.configService.get<string>('UBER_QUOTES_API_URL');
+    if (!endpoint) {
+      throw new ServiceUnavailableException({
+        code: 'PROVIDER_UNAVAILABLE',
+        message: 'UBER_QUOTES_API_URL is not configured',
+        details: { provider: 'uber' },
+      });
+    }
 
-    const peakFactor = hour >= 7 && hour <= 9 ? 1.2 : 1.0;
+    const token = this.configService.get<string>('UBER_SERVER_TOKEN');
 
-    return providers.map((provider, idx) => {
-      const providerSeed = (seed + idx * 97) % 997;
-      const isUberXL = provider === 'uberxl';
-      const base = (isUberXL ? 18 : 12) + (providerSeed % 7);
-      const variance = (isUberXL ? 5 : 3) + (providerSeed % 3);
-      const minPrice = Number((base * peakFactor).toFixed(1));
-      const maxPrice = Number((minPrice + variance).toFixed(1));
-      const etaMinutes = (isUberXL ? 5 : 4) + (providerSeed % 6);
-      const confidenceBase = isUberXL ? 0.8 : 0.84;
-      const confidence = Number((confidenceBase + ((providerSeed % 12) / 100)).toFixed(2));
+    try {
+      const response = await axios.post(
+        endpoint,
+        {
+          from: input.from,
+          to: input.to,
+          pickupAt: input.pickupAt.toISOString(),
+          fromCoordinates: input.fromCoordinates,
+          toCoordinates: input.toCoordinates,
+        },
+        {
+          timeout: 8000,
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'Content-Type': 'application/json',
+          },
+        },
+      );
 
-      return {
-        provider,
-        minPrice,
-        maxPrice,
-        etaMinutes,
-        confidence,
-        reasons: this.buildReasons(provider, peakFactor, confidence),
-      };
-    });
+      const rawOptions = this.extractRawOptions(response.data);
+      const normalized = rawOptions
+        .map((option) => this.normalizeOption(option))
+        .filter((option): option is QuoteOption => option !== null)
+        .filter((option) => option.provider === 'uberx' || option.provider === 'uberxl');
+
+      if (normalized.length === 0) {
+        throw new ServiceUnavailableException({
+          code: 'PROVIDER_UNAVAILABLE',
+          message: 'No Uber products available from live quote provider',
+          details: { provider: 'uber' },
+        });
+      }
+
+      return normalized;
+    } catch (error: unknown) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      this.logger.error(
+        `Uber live quote failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new ServiceUnavailableException({
+        code: 'PROVIDER_UNAVAILABLE',
+        message: 'No provider reachable',
+        details: { provider: 'uber' },
+      });
+    }
   }
 
-  private buildReasons(provider: string, peakFactor: number, confidence: number): string[] {
-    const reasons = [
-      'live uber quote',
-      peakFactor > 1 ? 'peak-hour demand detected' : 'stable traffic conditions',
-      confidence > 0.9
-        ? 'high provider reliability for this route window'
-        : 'moderate provider reliability for this route window',
-    ];
-    if (provider === 'uberx') {
+  private extractRawOptions(payload: any): any[] {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+    if (Array.isArray(payload?.options)) {
+      return payload.options;
+    }
+    return [];
+  }
+
+  private normalizeOption(option: any): QuoteOption | null {
+    const provider = String(option?.provider ?? '').toLowerCase();
+    const minPrice = Number(option?.minPrice);
+    const maxPrice = Number(option?.maxPrice);
+    const etaMinutes = Number(option?.etaMinutes);
+    const confidence = Number(option?.confidence ?? 0.85);
+
+    if (!provider || !Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) {
+      return null;
+    }
+    if (!Number.isFinite(etaMinutes) || etaMinutes <= 0) {
+      return null;
+    }
+
+    const reasons = Array.isArray(option?.reasons)
+      ? option.reasons.map((reason: unknown) => String(reason))
+      : [];
+
+    if (!reasons.includes('live uber quote')) {
+      reasons.unshift('live uber quote');
+    }
+    if (provider === 'uberx' && !reasons.includes('best price among enabled uber products')) {
       reasons.push('best price among enabled uber products');
     }
-    if (provider === 'uberxl') {
-      reasons.push('larger vehicle option with higher fare band');
-    }
-    return reasons;
-  }
 
-  private hash(value: string): number {
-    let h = 0;
-    for (let i = 0; i < value.length; i++) {
-      h = (h << 5) - h + value.charCodeAt(i);
-      h |= 0;
-    }
-    return Math.abs(h);
+    return {
+      provider,
+      minPrice: Number(minPrice.toFixed(2)),
+      maxPrice: Number(maxPrice.toFixed(2)),
+      etaMinutes,
+      confidence: Number(Math.max(0, Math.min(1, confidence)).toFixed(2)),
+      reasons,
+    };
   }
 }

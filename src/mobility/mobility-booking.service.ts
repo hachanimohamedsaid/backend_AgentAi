@@ -5,10 +5,7 @@ import {
   MobilityBooking,
   MobilityBookingDocument,
 } from './schemas/mobility-booking.schema';
-import {
-  MobilityProposal,
-  MobilityProposalDocument,
-} from './schemas/mobility-proposal.schema';
+import { MobilityProposalDocument } from './schemas/mobility-proposal.schema';
 
 @Injectable()
 export class MobilityBookingService {
@@ -17,27 +14,63 @@ export class MobilityBookingService {
     private readonly bookingModel: Model<MobilityBookingDocument>,
   ) {}
 
-  async bookFromProposal(
+  async createPendingFromProposal(
     userId: string,
     proposal: MobilityProposalDocument,
   ): Promise<MobilityBookingDocument> {
-    const now = Date.now();
-    const booking = new this.bookingModel({
-      userId,
-      proposalId: (proposal as any)._id.toString(),
-      provider: proposal.best.provider,
-      status: 'CONFIRMED',
-      from: proposal.from,
-      to: proposal.to,
-      pickupAt: proposal.pickupAt,
-      minPrice: proposal.best.minPrice,
-      maxPrice: proposal.best.maxPrice,
-      etaMinutes: proposal.best.etaMinutes,
-      externalBookingId: `mock_${proposal.best.provider}_${now}`,
-      errorMessage: null,
-    });
+    const proposalId = (proposal as any)._id.toString();
+    const provider = proposal.selectedProvider ?? proposal.best.provider;
 
-    return booking.save();
+    return this.bookingModel
+      .findOneAndUpdate(
+        { proposalId, userId },
+        {
+          $set: {
+            provider,
+            status: 'PENDING_PROVIDER',
+            from: proposal.from,
+            to: proposal.to,
+            pickupAt: proposal.pickupAt,
+            minPrice: proposal.best.minPrice,
+            maxPrice: proposal.best.maxPrice,
+            etaMinutes: proposal.best.etaMinutes,
+            providerBookingRef: null,
+            providerPayloadLast: null,
+            errorMessage: null,
+          },
+          $setOnInsert: {
+            proposalId,
+            userId,
+          },
+        },
+        { new: true, upsert: true },
+      )
+      .exec();
+  }
+
+  async updateStatusByProposalId(
+    proposalId: string,
+    status: 'PENDING_PROVIDER' | 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'CANCELED' | 'EXPIRED' | 'COMPLETED',
+    options?: {
+      providerBookingRef?: string | null;
+      providerPayloadLast?: Record<string, unknown> | null;
+      errorMessage?: string | null;
+    },
+  ) {
+    return this.bookingModel
+      .findOneAndUpdate(
+        { proposalId },
+        {
+          $set: {
+            status,
+            providerBookingRef: options?.providerBookingRef ?? null,
+            providerPayloadLast: options?.providerPayloadLast ?? null,
+            errorMessage: options?.errorMessage ?? null,
+          },
+        },
+        { new: true },
+      )
+      .exec();
   }
 
   async listForUser(userId: string) {

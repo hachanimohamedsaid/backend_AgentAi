@@ -1,15 +1,19 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   NotFoundException,
   Param,
   Patch,
   Post,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -36,6 +40,7 @@ export class MobilityController {
     private readonly pricingEngine: MobilityPricingEngine,
     private readonly approvalService: MobilityApprovalService,
     private readonly bookingService: MobilityBookingService,
+    private readonly configService: ConfigService,
     @InjectModel(MobilityRule.name)
     private readonly ruleModel: Model<MobilityRuleDocument>,
   ) {}
@@ -47,6 +52,8 @@ export class MobilityController {
       from: dto.from,
       to: dto.to,
       pickupAt: new Date(dto.pickupAt),
+      fromCoordinates: dto.fromCoordinates,
+      toCoordinates: dto.toCoordinates,
     });
     const ranked = this.pricingEngine.rank(options, dto.preferences);
     return {
@@ -88,7 +95,10 @@ export class MobilityController {
       .exec();
 
     if (!updated) {
-      throw new NotFoundException('Mobility rule not found');
+      throw new NotFoundException({
+        code: 'RULE_NOT_FOUND',
+        message: 'Mobility rule not found',
+      });
     }
     return updated;
   }
@@ -114,6 +124,12 @@ export class MobilityController {
   ) {
     const userId = (user as any)._id?.toString();
     const proposalId = params.id ?? params.proposalId ?? '';
+    if (!proposalId) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'proposalId is required',
+      });
+    }
     return this.approvalService.confirm(userId, proposalId);
   }
 
@@ -125,12 +141,74 @@ export class MobilityController {
   ) {
     const userId = (user as any)._id?.toString();
     const proposalId = params.id ?? params.proposalId ?? '';
+    if (!proposalId) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'proposalId is required',
+      });
+    }
     return this.approvalService.reject(userId, proposalId);
+  }
+
+  @Post('proposals/:id/cancel')
+  @Post('proposals/:proposalId/cancel')
+  async cancel(
+    @CurrentUser() user: UserDocument,
+    @Param() params: { id?: string; proposalId?: string },
+  ) {
+    const userId = (user as any)._id?.toString();
+    const proposalId = params.id ?? params.proposalId ?? '';
+    if (!proposalId) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'proposalId is required',
+      });
+    }
+    return this.approvalService.cancel(userId, proposalId);
   }
 
   @Get('bookings')
   async bookings(@CurrentUser() user: UserDocument) {
     const userId = (user as any)._id?.toString();
-    return this.bookingService.listForUser(userId);
+    const items = await this.bookingService.listForUser(userId);
+    return items.map((booking: any) => ({
+      id: booking.id ?? booking._id?.toString(),
+      proposalId: booking.proposalId,
+      provider: booking.provider,
+      status: booking.status,
+      providerBookingRef: booking.providerBookingRef ?? null,
+      createdAt: booking.createdAt,
+      updatedAt: booking.updatedAt,
+    }));
+  }
+
+  @Post('providers/uber/webhook')
+  @HttpCode(HttpStatus.OK)
+  async handleUberWebhook(
+    @Headers('x-uber-webhook-secret') secretHeader: string | undefined,
+    @Body()
+    body: {
+      proposalId?: string;
+      eventType?: string;
+      providerBookingRef?: string;
+      [key: string]: unknown;
+    },
+  ) {
+    const expected = this.configService.get<string>('UBER_WEBHOOK_SECRET');
+    if (expected && secretHeader !== expected) {
+      throw new UnauthorizedException({
+        code: 'FORBIDDEN',
+        message: 'Invalid webhook secret',
+      });
+    }
+
+    if (!body.proposalId || !body.eventType) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'proposalId and eventType are required',
+      });
+    }
+
+    return this.approvalService.handleProviderEvent(body.proposalId, body.eventType, body);
   }
 }

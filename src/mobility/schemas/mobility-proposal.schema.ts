@@ -56,8 +56,30 @@ export class MobilityProposal {
   @Prop({ type: String, default: null })
   quoteRunId: string | null;
 
-  @Prop({ required: true, enum: ['PENDING_USER_APPROVAL', 'CONFIRMED', 'REJECTED', 'FAILED', 'EXPIRED'], default: 'PENDING_USER_APPROVAL', index: true })
-  status: 'PENDING_USER_APPROVAL' | 'CONFIRMED' | 'REJECTED' | 'FAILED' | 'EXPIRED';
+  @Prop({
+    required: true,
+    enum: [
+      'PENDING_USER_APPROVAL',
+      'PENDING_PROVIDER',
+      'ACCEPTED',
+      'REJECTED',
+      'FAILED',
+      'CANCELED',
+      'EXPIRED',
+      'COMPLETED',
+    ],
+    default: 'PENDING_USER_APPROVAL',
+    index: true,
+  })
+  status:
+    | 'PENDING_USER_APPROVAL'
+    | 'PENDING_PROVIDER'
+    | 'ACCEPTED'
+    | 'REJECTED'
+    | 'FAILED'
+    | 'CANCELED'
+    | 'EXPIRED'
+    | 'COMPLETED';
 
   @Prop({ required: true })
   from: string;
