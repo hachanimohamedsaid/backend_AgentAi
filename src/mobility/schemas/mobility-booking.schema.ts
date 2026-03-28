@@ -8,7 +8,7 @@ export class MobilityBooking {
   @Prop({ required: true, index: true })
   userId: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   proposalId: string;
 
   @Prop({ required: true })
@@ -60,6 +60,7 @@ export class MobilityBooking {
 }
 
 export const MobilityBookingSchema = SchemaFactory.createForClass(MobilityBooking);
+MobilityBookingSchema.index({ proposalId: 1 }, { unique: true });
 
 MobilityBookingSchema.set('toJSON', {
   transform: (_doc: unknown, ret: any) => {

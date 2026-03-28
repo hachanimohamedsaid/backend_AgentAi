@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
+import { Logger } from '@nestjs/common';
 import {
   MobilityProposal,
   MobilityProposalDocument,
@@ -11,6 +13,8 @@ import { CreateProposalDto } from './dto/create-proposal.dto';
 
 @Injectable()
 export class MobilityApprovalService {
+  private readonly logger = new Logger(MobilityApprovalService.name);
+
   constructor(
     @InjectModel(MobilityProposal.name)
     private readonly proposalModel: Model<MobilityProposalDocument>,
@@ -71,6 +75,11 @@ export class MobilityApprovalService {
   }
 
   async confirm(userId: string, proposalId: string) {
+    this.logEvent('mobility.confirm.received', {
+      proposalId,
+      userId,
+    });
+
     const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
 
     if (!proposal) {
@@ -78,6 +87,26 @@ export class MobilityApprovalService {
         code: 'PROPOSAL_NOT_FOUND',
         message: 'Pending proposal not found',
       });
+    }
+
+    if (proposal.status === 'PENDING_PROVIDER') {
+      return {
+        ok: true,
+        proposalId: (proposal as any)._id?.toString(),
+        bookingId: proposal.bookingId,
+        status: proposal.status,
+        message: 'Driver search already started',
+      };
+    }
+
+    if (['ACCEPTED', 'REJECTED', 'FAILED', 'EXPIRED', 'CANCELED', 'COMPLETED'].includes(proposal.status)) {
+      return {
+        ok: true,
+        proposalId: (proposal as any)._id?.toString(),
+        bookingId: proposal.bookingId,
+        status: proposal.status,
+        message: 'Proposal already finalized',
+      };
     }
 
     if (proposal.status !== 'PENDING_USER_APPROVAL') {
@@ -97,10 +126,21 @@ export class MobilityApprovalService {
     }
 
     const booking = await this.bookingService.createPendingFromProposal(userId, proposal);
+    this.logEvent('mobility.confirm.saved_pending_provider', {
+      proposalId: (proposal as any)._id?.toString(),
+      bookingId: (booking as any)?._id?.toString(),
+      userId,
+      oldStatus: 'PENDING_USER_APPROVAL',
+      newStatus: 'PENDING_PROVIDER',
+      provider: proposal.selectedProvider ?? proposal.best.provider,
+    });
+
     proposal.status = 'PENDING_PROVIDER';
     proposal.confirmedAt = new Date();
     proposal.bookingId = (booking as any)._id?.toString() ?? null;
     await proposal.save();
+
+    this.enqueueProviderDispatch((proposal as any)._id?.toString(), proposal.bookingId ?? '', userId);
 
     return {
       ok: true,
@@ -206,6 +246,15 @@ export class MobilityApprovalService {
     proposal.status = targetStatus;
     await proposal.save();
 
+    this.logEvent('mobility.proposal.status.updated', {
+      event: normalized,
+      proposalId: (proposal as any)._id.toString(),
+      oldStatus: 'PENDING_PROVIDER',
+      newStatus: targetStatus,
+      userId: proposal.userId,
+      provider: proposal.selectedProvider ?? proposal.best.provider,
+    });
+
     const booking = await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), targetStatus, {
       providerBookingRef:
         typeof payload?.providerBookingRef === 'string'
@@ -218,12 +267,138 @@ export class MobilityApprovalService {
           : null,
     });
 
+    this.logEvent('mobility.booking.status.updated', {
+      event: normalized,
+      proposalId: (proposal as any)._id.toString(),
+      bookingId: (booking as any)?._id?.toString() ?? null,
+      oldStatus: 'PENDING_PROVIDER',
+      newStatus: targetStatus,
+      userId: proposal.userId,
+      provider: proposal.selectedProvider ?? proposal.best.provider,
+      providerBookingRef: (booking as any)?.providerBookingRef ?? null,
+    });
+
     return {
       ok: true,
       proposalId: (proposal as any)._id.toString(),
       bookingId: (booking as any)?._id?.toString() ?? null,
       status: targetStatus,
     };
+  }
+
+  private enqueueProviderDispatch(proposalId: string, bookingId: string, userId: string) {
+    this.logEvent('mobility.dispatch.enqueued', {
+      proposalId,
+      bookingId,
+      userId,
+    });
+
+    setImmediate(() => {
+      void this.dispatchProviderRequest(proposalId, bookingId, userId);
+    });
+  }
+
+  private async dispatchProviderRequest(proposalId: string, bookingId: string, userId: string) {
+    this.logEvent('mobility.dispatch.started', {
+      proposalId,
+      bookingId,
+      userId,
+    });
+
+    const proposal = await this.proposalModel.findById(proposalId).exec();
+    if (!proposal || proposal.status !== 'PENDING_PROVIDER') {
+      return;
+    }
+
+    const dispatchUrl = this.configService.get<string>('UBER_DISPATCH_API_URL');
+    const dispatchToken = this.configService.get<string>('UBER_SERVER_TOKEN');
+
+    if (!dispatchUrl) {
+      this.logEvent('mobility.dispatch.failed', {
+        proposalId,
+        bookingId,
+        userId,
+        errorCode: 'PROVIDER_UNAVAILABLE',
+        errorMessage: 'UBER_DISPATCH_API_URL not configured',
+      });
+      await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
+        errorCode: 'PROVIDER_UNAVAILABLE',
+        errorMessage: 'UBER_DISPATCH_API_URL not configured',
+      });
+      return;
+    }
+
+    try {
+      this.logEvent('mobility.provider.request.sent', {
+        proposalId,
+        bookingId,
+        userId,
+        provider: proposal.selectedProvider ?? proposal.best.provider,
+      });
+
+      const response = await axios.post(
+        dispatchUrl,
+        {
+          proposalId,
+          bookingId,
+          userId,
+          provider: proposal.selectedProvider ?? proposal.best.provider,
+          from: proposal.from,
+          to: proposal.to,
+          pickupAt: proposal.pickupAt,
+        },
+        {
+          timeout: 10000,
+          headers: {
+            ...(dispatchToken ? { Authorization: `Bearer ${dispatchToken}` } : {}),
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      this.logEvent('mobility.provider.response', {
+        proposalId,
+        bookingId,
+        userId,
+        provider: proposal.selectedProvider ?? proposal.best.provider,
+        providerStatus: response.data?.status ?? null,
+      });
+
+      const providerStatus = String(response.data?.status ?? '').toUpperCase();
+      if (providerStatus === 'ACCEPTED' || providerStatus === 'DRIVER_ACCEPTED') {
+        await this.handleProviderEvent(proposalId, 'DRIVER_ACCEPTED', {
+          providerBookingRef: response.data?.providerBookingRef ?? null,
+          raw: response.data,
+        });
+      } else if (providerStatus === 'REJECTED' || providerStatus === 'DRIVER_NOT_FOUND') {
+        await this.handleProviderEvent(proposalId, 'DRIVER_NOT_FOUND', {
+          raw: response.data,
+        });
+      } else if (providerStatus === 'TIMEOUT') {
+        await this.handleProviderEvent(proposalId, 'TIMEOUT', {
+          raw: response.data,
+        });
+      }
+      // If provider responds with async processing state, webhook will finalize status.
+    } catch (error: any) {
+      const errorCode = error?.code === 'ECONNABORTED' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE';
+      this.logEvent('mobility.dispatch.failed', {
+        proposalId,
+        bookingId,
+        userId,
+        errorCode,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      await this.handleProviderEvent(proposalId, errorCode === 'PROVIDER_TIMEOUT' ? 'TIMEOUT' : 'DISPATCH_FAILED', {
+        errorCode,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private logEvent(event: string, payload: Record<string, unknown>) {
+    this.logger.log(JSON.stringify({ event, ...payload }));
   }
 
   private toFrontendProposal(proposal: MobilityProposalDocument) {

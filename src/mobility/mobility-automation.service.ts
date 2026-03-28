@@ -17,6 +17,7 @@ import {
 } from './schemas/mobility-quote-run.schema';
 import { MobilityQuotesService } from './mobility-quotes.service';
 import { MobilityPricingEngine } from './mobility-pricing.engine';
+import { MobilityBookingDocument } from './schemas/mobility-booking.schema';
 
 @Injectable()
 export class MobilityAutomationService {
@@ -32,6 +33,8 @@ export class MobilityAutomationService {
     private readonly quotesService: MobilityQuotesService,
     private readonly pricingEngine: MobilityPricingEngine,
     private readonly configService: ConfigService,
+    @InjectModel('MobilityBooking')
+    private readonly bookingModel: Model<MobilityBookingDocument>,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -185,5 +188,53 @@ export class MobilityAutomationService {
       hour: Number(map.hour),
       minute: Number(map.minute),
     };
+  }
+
+  @Cron('*/2 * * * *')
+  async expireStalePendingProvider() {
+    try {
+      const now = new Date();
+      const ttlMinutes = 5;
+      const staleBefore = new Date(now.getTime() - ttlMinutes * 60 * 1000);
+
+      const staleProposals = await this.proposalModel
+        .find({
+          status: 'PENDING_PROVIDER',
+          confirmedAt: { $lt: staleBefore },
+        })
+        .exec();
+
+      for (const proposal of staleProposals) {
+        const proposalId = (proposal as any)._id.toString();
+        const oldProposalStatus = proposal.status;
+        proposal.status = 'EXPIRED';
+        await proposal.save();
+
+        const booking = await this.bookingModel.findOne({ proposalId }).exec();
+        let oldBookingStatus: string | null = null;
+        if (booking && booking.status === 'PENDING_PROVIDER') {
+          oldBookingStatus = booking.status;
+          booking.status = 'EXPIRED';
+          await booking.save();
+        }
+
+        this.logger.log(
+          JSON.stringify({
+            event: 'mobility.watchdog.expired',
+            proposalId,
+            bookingId: booking ? (booking as any)._id.toString() : null,
+            userId: proposal.userId,
+            provider: proposal.selectedProvider ?? proposal.best.provider,
+            oldStatus: oldProposalStatus,
+            newStatus: proposal.status,
+            oldBookingStatus,
+            newBookingStatus: booking?.status ?? null,
+            ageMinutes: ttlMinutes,
+          }),
+        );
+      }
+    } catch (error) {
+      this.logger.error('Failed to expire stale pending provider bookings', error instanceof Error ? error.stack : undefined);
+    }
   }
 }

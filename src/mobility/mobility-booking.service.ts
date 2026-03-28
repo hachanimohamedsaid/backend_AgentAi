@@ -57,20 +57,25 @@ export class MobilityBookingService {
       errorMessage?: string | null;
     },
   ) {
-    return this.bookingModel
-      .findOneAndUpdate(
-        { proposalId },
-        {
-          $set: {
-            status,
-            providerBookingRef: options?.providerBookingRef ?? null,
-            providerPayloadLast: options?.providerPayloadLast ?? null,
-            errorMessage: options?.errorMessage ?? null,
-          },
-        },
-        { new: true },
-      )
-      .exec();
+    const booking = await this.bookingModel.findOne({ proposalId }).exec();
+    if (!booking) {
+      return null;
+    }
+
+    const current = booking.status;
+    if (
+      (current === 'ACCEPTED' || current === 'COMPLETED') &&
+      (status === 'PENDING_PROVIDER' || status === 'REJECTED' || status === 'FAILED' || status === 'EXPIRED')
+    ) {
+      return booking;
+    }
+
+    booking.status = status;
+    booking.providerBookingRef = options?.providerBookingRef ?? booking.providerBookingRef ?? null;
+    booking.providerPayloadLast = options?.providerPayloadLast ?? booking.providerPayloadLast ?? null;
+    booking.errorMessage = options?.errorMessage ?? null;
+    await booking.save();
+    return booking;
   }
 
   async listForUser(userId: string) {
