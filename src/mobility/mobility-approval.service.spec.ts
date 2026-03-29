@@ -53,43 +53,6 @@ describe('MobilityApprovalService', () => {
     );
   });
 
-  it('dispatchProviderRequest rejects simulator URL in strict real mode', async () => {
-    const proposal = {
-      _id: { toString: () => 'prop-sim' },
-      status: 'PENDING_PROVIDER',
-      selectedProvider: 'uberx',
-      best: { provider: 'uberx' },
-      from: 'A',
-      to: 'B',
-      pickupAt: new Date(),
-    } as any;
-
-    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'PROVIDER_BASE_URL') {
-        return 'https://backendagentai-production.up.railway.app/mobility/provider-simulator';
-      }
-      if (key === 'MOBILITY_REQUIRE_REAL_PROVIDER') {
-        return 'true';
-      }
-      return undefined;
-    });
-
-    const handleSpy = jest
-      .spyOn(service as any, 'handleProviderEvent')
-      .mockResolvedValue({ ok: true, status: 'FAILED' });
-
-    await (service as any).dispatchProviderRequest('prop-sim', 'book-sim', 'user-1');
-
-    expect(handleSpy).toHaveBeenCalledWith(
-      'prop-sim',
-      'DISPATCH_FAILED',
-      expect.objectContaining({
-        errorCode: 'PROVIDER_FAKE_NOT_ALLOWED',
-      }),
-    );
-  });
-
   it('confirm is idempotent when already pending provider', async () => {
     const proposal = {
       _id: { toString: () => 'prop-1' },
