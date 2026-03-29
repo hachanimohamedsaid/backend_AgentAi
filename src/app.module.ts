@@ -15,6 +15,7 @@ import { AdvisorModule } from './advisor/advisor.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MlModule } from './ml/ml.module';
 import { MeetingModule } from './meeting/meeting.module';
+import { MarketIntelligenceModule } from './market-intelligence/market-intelligence.module';
 import { BillingModule } from './billing/billing.module';
 import { MobilityModule } from './mobility/mobility.module';
 import { SocialCampaignModule } from './social-campaign/social-campaign.module';
@@ -66,6 +67,7 @@ import { SocialCampaignModule } from './social-campaign/social-campaign.module';
     AssistantModule,
     MlModule,
     MeetingModule,
+    MarketIntelligenceModule,
     BillingModule,
     MobilityModule,
     SocialCampaignModule,

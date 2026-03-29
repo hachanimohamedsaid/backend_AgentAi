@@ -10,7 +10,7 @@ export class Habit {
   userId: string;
 
   // Track success rate per suggestion type (free-form string)
-  @Prop({ required: true })
+  @Prop({ required: true, type: String })
   suggestionType: SuggestionType;
 
   /** Success rate between 0 and 1 */
