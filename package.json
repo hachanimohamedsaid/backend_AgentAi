@@ -33,6 +33,7 @@
     "@nestjs/passport": "^11.0.0",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-ws": "^11.1.12",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/websockets": "^11.1.12",
     "axios": "^1.13.5",
     "bcrypt": "^5.1.1",
@@ -49,6 +50,7 @@
     "reflect-metadata": "^0.2.2",
     "resend": "^6.9.1",
     "rxjs": "^7.8.1",
+    "stripe": "^21.0.1",
     "ws": "^8.19.0"
   },
   "devDependencies": {

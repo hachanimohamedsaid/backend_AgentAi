@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -15,6 +16,9 @@ import { AssistantModule } from './assistant/assistant.module';
 import { MlModule } from './ml/ml.module';
 import { MeetingModule } from './meeting/meeting.module';
 import { MarketIntelligenceModule } from './market-intelligence/market-intelligence.module';
+import { BillingModule } from './billing/billing.module';
+import { MobilityModule } from './mobility/mobility.module';
+import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 
 @Module({
   imports: [
@@ -23,6 +27,7 @@ import { MarketIntelligenceModule } from './market-intelligence/market-intellige
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     // MongoDB connection via Mongoose; URI from MONGO_URI or MONGODB_URI env var
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -63,6 +68,9 @@ import { MarketIntelligenceModule } from './market-intelligence/market-intellige
     MlModule,
     MeetingModule,
     MarketIntelligenceModule,
+    BillingModule,
+    MobilityModule,
+    SocialCampaignModule,
   ],
   controllers: [AppController],
   providers: [AppService],
