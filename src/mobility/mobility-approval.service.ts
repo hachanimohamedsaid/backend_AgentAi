@@ -442,12 +442,32 @@ export class MobilityApprovalService {
       this.configService.get<string>('UBER_DISPATCH_API_URL');
     const allowLocalFallback =
       (this.configService.get<string>('MOBILITY_ALLOW_LOCAL_FALLBACK') ?? 'false').toLowerCase() === 'true';
+    const requireRealProvider =
+      (this.configService.get<string>('MOBILITY_REQUIRE_REAL_PROVIDER') ?? 'true').toLowerCase() === 'true';
+    const isSimulatorUrl =
+      typeof dispatchUrl === 'string' && /\/mobility\/provider-simulator(?:\/|$)/i.test(dispatchUrl);
     const dispatchToken =
       this.configService.get<string>('PROVIDER_API_KEY') ??
       this.configService.get<string>('UBER_SERVER_TOKEN');
     const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
 
-    if (!dispatchUrl && allowLocalFallback) {
+    if (requireRealProvider && isSimulatorUrl) {
+      this.logEvent('mobility.dispatch.failed', {
+        proposalId,
+        bookingId,
+        userId,
+        errorCode: 'PROVIDER_FAKE_NOT_ALLOWED',
+        errorMessage: 'Simulator provider is disabled in real-only mode',
+      });
+
+      await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
+        errorCode: 'PROVIDER_FAKE_NOT_ALLOWED',
+        errorMessage: 'Simulator provider is disabled in real-only mode',
+      });
+      return;
+    }
+
+    if (!dispatchUrl && allowLocalFallback && !requireRealProvider) {
       const localRef = `local-${proposalId}-${Date.now()}`;
       const fallbackLat =
         proposal.fromCoordinates?.latitude ??
