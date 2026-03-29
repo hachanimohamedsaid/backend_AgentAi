@@ -14,6 +14,14 @@ import { CreateProposalDto } from './dto/create-proposal.dto';
 @Injectable()
 export class MobilityApprovalService {
   private readonly logger = new Logger(MobilityApprovalService.name);
+  private readonly terminalStatuses = new Set([
+    'ACCEPTED',
+    'REJECTED',
+    'FAILED',
+    'CANCELED',
+    'EXPIRED',
+    'COMPLETED',
+  ]);
 
   constructor(
     @InjectModel(MobilityProposal.name)
@@ -243,13 +251,26 @@ export class MobilityApprovalService {
       targetStatus = 'FAILED';
     }
 
+    const oldStatus = proposal.status;
+    if (this.isTerminalStatus(oldStatus)) {
+      const canAdvance = oldStatus === 'ACCEPTED' && targetStatus === 'COMPLETED';
+      if (!canAdvance) {
+        return {
+          ok: true,
+          proposalId: (proposal as any)._id.toString(),
+          bookingId: proposal.bookingId ?? null,
+          status: oldStatus,
+        };
+      }
+    }
+
     proposal.status = targetStatus;
     await proposal.save();
 
     this.logEvent('mobility.proposal.status.updated', {
-      event: normalized,
+      providerEvent: normalized,
       proposalId: (proposal as any)._id.toString(),
-      oldStatus: 'PENDING_PROVIDER',
+      oldStatus,
       newStatus: targetStatus,
       userId: proposal.userId,
       provider: proposal.selectedProvider ?? proposal.best.provider,
@@ -261,21 +282,32 @@ export class MobilityApprovalService {
           ? payload.providerBookingRef
           : null,
       providerPayloadLast: payload ?? null,
+      failureCode:
+        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
+          ? String(payload?.errorCode ?? normalized)
+          : null,
+      failureMessage:
+        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
+          ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
+          : null,
       errorMessage:
         targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
-          ? `Provider event: ${normalized}`
+          ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
           : null,
     });
 
     this.logEvent('mobility.booking.status.updated', {
-      event: normalized,
+      providerEvent: normalized,
       proposalId: (proposal as any)._id.toString(),
       bookingId: (booking as any)?._id?.toString() ?? null,
-      oldStatus: 'PENDING_PROVIDER',
+      oldStatus,
       newStatus: targetStatus,
       userId: proposal.userId,
       provider: proposal.selectedProvider ?? proposal.best.provider,
       providerBookingRef: (booking as any)?.providerBookingRef ?? null,
+      errorCode: targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
+        ? String(payload?.errorCode ?? normalized)
+        : null,
     });
 
     return {
@@ -310,20 +342,25 @@ export class MobilityApprovalService {
       return;
     }
 
-    const dispatchUrl = this.configService.get<string>('UBER_DISPATCH_API_URL');
-    const dispatchToken = this.configService.get<string>('UBER_SERVER_TOKEN');
+    const dispatchUrl =
+      this.configService.get<string>('PROVIDER_BASE_URL') ??
+      this.configService.get<string>('UBER_DISPATCH_API_URL');
+    const dispatchToken =
+      this.configService.get<string>('PROVIDER_API_KEY') ??
+      this.configService.get<string>('UBER_SERVER_TOKEN');
+    const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
 
     if (!dispatchUrl) {
       this.logEvent('mobility.dispatch.failed', {
         proposalId,
         bookingId,
         userId,
-        errorCode: 'PROVIDER_UNAVAILABLE',
-        errorMessage: 'UBER_DISPATCH_API_URL not configured',
+        errorCode: 'PROVIDER_CONFIG_MISSING',
+        errorMessage: 'Provider dispatch URL not configured',
       });
       await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
-        errorCode: 'PROVIDER_UNAVAILABLE',
-        errorMessage: 'UBER_DISPATCH_API_URL not configured',
+        errorCode: 'PROVIDER_CONFIG_MISSING',
+        errorMessage: 'Provider dispatch URL not configured',
       });
       return;
     }
@@ -348,7 +385,7 @@ export class MobilityApprovalService {
           pickupAt: proposal.pickupAt,
         },
         {
-          timeout: 10000,
+          timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
           headers: {
             ...(dispatchToken ? { Authorization: `Bearer ${dispatchToken}` } : {}),
             'Content-Type': 'application/json',
@@ -361,6 +398,7 @@ export class MobilityApprovalService {
         bookingId,
         userId,
         provider: proposal.selectedProvider ?? proposal.best.provider,
+        httpStatus: response.status,
         providerStatus: response.data?.status ?? null,
       });
 
@@ -378,23 +416,73 @@ export class MobilityApprovalService {
         await this.handleProviderEvent(proposalId, 'TIMEOUT', {
           raw: response.data,
         });
+      } else if (providerStatus && !['PENDING', 'PROCESSING', 'QUEUED'].includes(providerStatus)) {
+        await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
+          errorCode: 'PROVIDER_UNKNOWN_STATUS',
+          errorMessage: `Unsupported provider status: ${providerStatus}`,
+          raw: response.data,
+        });
       }
       // If provider responds with async processing state, webhook will finalize status.
     } catch (error: any) {
-      const errorCode = error?.code === 'ECONNABORTED' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE';
+      const mapped = this.mapDispatchErrorToProviderFailure(error);
       this.logEvent('mobility.dispatch.failed', {
         proposalId,
         bookingId,
         userId,
-        errorCode,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorCode: mapped.errorCode,
+        errorMessage: mapped.errorMessage,
       });
 
-      await this.handleProviderEvent(proposalId, errorCode === 'PROVIDER_TIMEOUT' ? 'TIMEOUT' : 'DISPATCH_FAILED', {
-        errorCode,
-        errorMessage: error instanceof Error ? error.message : String(error),
+      await this.handleProviderEvent(proposalId, mapped.eventType, {
+        errorCode: mapped.errorCode,
+        errorMessage: mapped.errorMessage,
       });
     }
+  }
+
+  private mapDispatchErrorToProviderFailure(error: unknown): {
+    eventType: 'TIMEOUT' | 'DRIVER_NOT_FOUND' | 'DISPATCH_FAILED';
+    errorCode: string;
+    errorMessage: string;
+  } {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (error.code === 'ECONNABORTED') {
+        return {
+          eventType: 'TIMEOUT',
+          errorCode: 'PROVIDER_TIMEOUT',
+          errorMessage: 'Provider timeout reached',
+        };
+      }
+
+      if (status === 404 || status === 409 || status === 422) {
+        return {
+          eventType: 'DRIVER_NOT_FOUND',
+          errorCode: `PROVIDER_${status}`,
+          errorMessage: 'No driver available for this request',
+        };
+      }
+
+      return {
+        eventType: 'DISPATCH_FAILED',
+        errorCode: status ? `PROVIDER_HTTP_${status}` : 'PROVIDER_UNAVAILABLE',
+        errorMessage:
+          typeof error.message === 'string' && error.message.length > 0
+            ? error.message
+            : 'Provider request failed',
+      };
+    }
+
+    return {
+      eventType: 'DISPATCH_FAILED',
+      errorCode: 'PROVIDER_UNAVAILABLE',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  private isTerminalStatus(status: string): boolean {
+    return this.terminalStatuses.has(status);
   }
 
   private logEvent(event: string, payload: Record<string, unknown>) {

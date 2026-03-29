@@ -121,4 +121,33 @@ describe('MobilityApprovalService', () => {
       status: 'ACCEPTED',
     });
   });
+
+  it('handleProviderEvent does not regress terminal proposal', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const proposal = {
+      _id: { toString: () => 'prop-5' },
+      userId: 'user-1',
+      status: 'REJECTED',
+      bookingId: 'book-5',
+      selectedProvider: 'uberx',
+      best: { provider: 'uberx' },
+      save,
+    } as any;
+
+    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+
+    const res = await service.handleProviderEvent('prop-5', 'DISPATCH_FAILED', {
+      errorCode: 'PROVIDER_HTTP_500',
+      errorMessage: 'late error',
+    });
+
+    expect(res).toMatchObject({
+      ok: true,
+      proposalId: 'prop-5',
+      bookingId: 'book-5',
+      status: 'REJECTED',
+    });
+    expect(save).not.toHaveBeenCalled();
+    expect(bookingService.updateStatusByProposalId).not.toHaveBeenCalled();
+  });
 });

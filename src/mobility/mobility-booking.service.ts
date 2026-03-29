@@ -55,6 +55,8 @@ export class MobilityBookingService {
       providerBookingRef?: string | null;
       providerPayloadLast?: Record<string, unknown> | null;
       errorMessage?: string | null;
+      failureCode?: string | null;
+      failureMessage?: string | null;
     },
   ) {
     const booking = await this.bookingModel.findOne({ proposalId }).exec();
@@ -63,10 +65,9 @@ export class MobilityBookingService {
     }
 
     const current = booking.status;
-    if (
-      (current === 'ACCEPTED' || current === 'COMPLETED') &&
-      (status === 'PENDING_PROVIDER' || status === 'REJECTED' || status === 'FAILED' || status === 'EXPIRED')
-    ) {
+    const currentIsTerminal = ['ACCEPTED', 'REJECTED', 'FAILED', 'CANCELED', 'EXPIRED', 'COMPLETED'].includes(current);
+    const canAdvanceTerminal = current === 'ACCEPTED' && status === 'COMPLETED';
+    if (currentIsTerminal && !canAdvanceTerminal) {
       return booking;
     }
 
@@ -74,6 +75,8 @@ export class MobilityBookingService {
     booking.providerBookingRef = options?.providerBookingRef ?? booking.providerBookingRef ?? null;
     booking.providerPayloadLast = options?.providerPayloadLast ?? booking.providerPayloadLast ?? null;
     booking.errorMessage = options?.errorMessage ?? null;
+    booking.failureCode = options?.failureCode ?? booking.failureCode ?? null;
+    booking.failureMessage = options?.failureMessage ?? booking.failureMessage ?? null;
     await booking.save();
     return booking;
   }

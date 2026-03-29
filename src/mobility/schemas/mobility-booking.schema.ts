@@ -55,6 +55,12 @@ export class MobilityBooking {
   @Prop({ type: String, default: null })
   errorMessage: string | null;
 
+  @Prop({ type: String, default: null })
+  failureCode: string | null;
+
+  @Prop({ type: String, default: null })
+  failureMessage: string | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

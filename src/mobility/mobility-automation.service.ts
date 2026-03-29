@@ -190,46 +190,61 @@ export class MobilityAutomationService {
     };
   }
 
-  @Cron('*/2 * * * *')
+  @Cron(CronExpression.EVERY_MINUTE)
   async expireStalePendingProvider() {
     try {
-      const now = new Date();
-      const ttlMinutes = 5;
-      const staleBefore = new Date(now.getTime() - ttlMinutes * 60 * 1000);
+      const watchdogMinutesRaw = Number(
+        this.configService.get<string>('MOBILITY_PROVIDER_WATCHDOG_MINUTES') ?? '3',
+      );
+      const watchdogMinutes = Number.isFinite(watchdogMinutesRaw)
+        ? Math.min(5, Math.max(2, Math.floor(watchdogMinutesRaw)))
+        : 3;
+      const staleBefore = new Date(Date.now() - watchdogMinutes * 60 * 1000);
 
-      const staleProposals = await this.proposalModel
+      const staleBookings = await this.bookingModel
         .find({
           status: 'PENDING_PROVIDER',
-          confirmedAt: { $lt: staleBefore },
+          createdAt: { $lt: staleBefore },
         })
         .exec();
 
-      for (const proposal of staleProposals) {
-        const proposalId = (proposal as any)._id.toString();
-        const oldProposalStatus = proposal.status;
-        proposal.status = 'EXPIRED';
-        await proposal.save();
+      for (const booking of staleBookings) {
+        const bookingId = (booking as any)._id.toString();
+        const proposalId = booking.proposalId;
+        const oldBookingStatus = booking.status;
+        booking.status = 'EXPIRED';
+        booking.failureCode = 'PROVIDER_TIMEOUT_WATCHDOG';
+        booking.failureMessage = 'No provider final response in allowed window';
+        booking.errorMessage = 'No provider final response in allowed window';
+        await booking.save();
 
-        const booking = await this.bookingModel.findOne({ proposalId }).exec();
-        let oldBookingStatus: string | null = null;
-        if (booking && booking.status === 'PENDING_PROVIDER') {
-          oldBookingStatus = booking.status;
-          booking.status = 'EXPIRED';
-          await booking.save();
+        const proposal = await this.proposalModel.findById(proposalId).exec();
+        let oldProposalStatus: string | null = null;
+        let newProposalStatus: string | null = null;
+        let userId: string | null = null;
+        let provider: string | null = null;
+        if (proposal && proposal.status === 'PENDING_PROVIDER') {
+          oldProposalStatus = proposal.status;
+          proposal.status = 'EXPIRED';
+          await proposal.save();
+          newProposalStatus = proposal.status;
+          userId = proposal.userId;
+          provider = proposal.selectedProvider ?? proposal.best.provider;
         }
 
         this.logger.log(
           JSON.stringify({
             event: 'mobility.watchdog.expired',
             proposalId,
-            bookingId: booking ? (booking as any)._id.toString() : null,
-            userId: proposal.userId,
-            provider: proposal.selectedProvider ?? proposal.best.provider,
+            bookingId,
+            userId,
+            provider,
             oldStatus: oldProposalStatus,
-            newStatus: proposal.status,
+            newStatus: newProposalStatus,
             oldBookingStatus,
-            newBookingStatus: booking?.status ?? null,
-            ageMinutes: ttlMinutes,
+            newBookingStatus: booking.status,
+            errorCode: 'PROVIDER_TIMEOUT_WATCHDOG',
+            ageMinutes: watchdogMinutes,
           }),
         );
       }
