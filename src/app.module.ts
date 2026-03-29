@@ -14,6 +14,7 @@ import { AdvisorModule } from './advisor/advisor.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { MlModule } from './ml/ml.module';
 import { MeetingModule } from './meeting/meeting.module';
+import { MarketIntelligenceModule } from './market-intelligence/market-intelligence.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { MeetingModule } from './meeting/meeting.module';
     AssistantModule,
     MlModule,
     MeetingModule,
+    MarketIntelligenceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
