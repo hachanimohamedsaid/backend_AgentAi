@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MobilityController } from './mobility.controller';
+import { MobilityProviderSimulatorController } from './mobility-provider-simulator.controller';
 import { MobilityQuotesService } from './mobility-quotes.service';
 import { MobilityPricingEngine } from './mobility-pricing.engine';
 import { MobilityAutomationService } from './mobility-automation.service';
@@ -34,7 +35,7 @@ import {
       { name: MobilityProviderToken.name, schema: MobilityProviderTokenSchema },
     ]),
   ],
-  controllers: [MobilityController],
+  controllers: [MobilityController, MobilityProviderSimulatorController],
   providers: [
     MobilityQuotesService,
     MobilityPricingEngine,

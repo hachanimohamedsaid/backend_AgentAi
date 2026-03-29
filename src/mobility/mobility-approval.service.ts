@@ -440,12 +440,14 @@ export class MobilityApprovalService {
     const dispatchUrl =
       this.configService.get<string>('PROVIDER_BASE_URL') ??
       this.configService.get<string>('UBER_DISPATCH_API_URL');
+    const allowLocalFallback =
+      (this.configService.get<string>('MOBILITY_ALLOW_LOCAL_FALLBACK') ?? 'false').toLowerCase() === 'true';
     const dispatchToken =
       this.configService.get<string>('PROVIDER_API_KEY') ??
       this.configService.get<string>('UBER_SERVER_TOKEN');
     const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
 
-    if (!dispatchUrl) {
+    if (!dispatchUrl && allowLocalFallback) {
       const localRef = `local-${proposalId}-${Date.now()}`;
       const fallbackLat =
         proposal.fromCoordinates?.latitude ??
@@ -492,6 +494,22 @@ export class MobilityApprovalService {
             model: 'Fallback Sedan',
           },
         },
+      });
+      return;
+    }
+
+    if (!dispatchUrl) {
+      this.logEvent('mobility.dispatch.failed', {
+        proposalId,
+        bookingId,
+        userId,
+        errorCode: 'PROVIDER_CONFIG_MISSING',
+        errorMessage: 'Provider dispatch URL not configured',
+      });
+
+      await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
+        errorCode: 'PROVIDER_CONFIG_MISSING',
+        errorMessage: 'Provider dispatch URL not configured',
       });
       return;
     }

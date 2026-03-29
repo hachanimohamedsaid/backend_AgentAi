@@ -24,7 +24,7 @@ describe('MobilityApprovalService', () => {
     jest.spyOn<any, any>(service as any, 'enqueueProviderDispatch').mockImplementation(() => undefined);
   });
 
-  it('dispatchProviderRequest falls back to local accepted when provider URL is missing', async () => {
+  it('dispatchProviderRequest fails when provider URL is missing in real-only mode', async () => {
     const proposal = {
       _id: { toString: () => 'prop-fallback' },
       status: 'PENDING_PROVIDER',
@@ -40,19 +40,15 @@ describe('MobilityApprovalService', () => {
 
     const handleSpy = jest
       .spyOn(service as any, 'handleProviderEvent')
-      .mockResolvedValue({ ok: true, status: 'ACCEPTED' });
+      .mockResolvedValue({ ok: true, status: 'FAILED' });
 
     await (service as any).dispatchProviderRequest('prop-fallback', 'book-fallback', 'user-1');
 
     expect(handleSpy).toHaveBeenCalledWith(
       'prop-fallback',
-      'DRIVER_ACCEPTED',
+      'DISPATCH_FAILED',
       expect.objectContaining({
-        providerBookingRef: expect.stringMatching(/^local-prop-fallback-/),
-        tripStatus: 'AWAITING_USER_DECISION',
-        driverName: 'Local Driver',
-        driverPhone: '+21600000000',
-        vehiclePlate: 'LOCAL-0000',
+        errorCode: 'PROVIDER_CONFIG_MISSING',
       }),
     );
   });
