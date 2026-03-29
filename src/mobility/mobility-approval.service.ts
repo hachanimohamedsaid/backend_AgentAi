@@ -239,6 +239,7 @@ export class MobilityApprovalService {
     }
 
     const normalized = eventType.toUpperCase();
+    const live = this.extractLiveProviderFields(payload);
     let targetStatus: 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'EXPIRED' | 'COMPLETED';
 
     if (normalized === 'DRIVER_ACCEPTED') {
@@ -281,6 +282,19 @@ export class MobilityApprovalService {
         typeof payload?.providerBookingRef === 'string'
           ? payload.providerBookingRef
           : null,
+      tripStatus:
+        targetStatus === 'ACCEPTED'
+          ? live.tripStatus ?? 'DRIVER_ARRIVING'
+          : targetStatus === 'COMPLETED'
+            ? 'COMPLETED'
+            : live.tripStatus,
+      driverName: live.driverName,
+      driverPhone: live.driverPhone,
+      vehiclePlate: live.vehiclePlate,
+      vehicleModel: live.vehicleModel,
+      etaMinutes: live.etaMinutes,
+      driverLatitude: live.driverLatitude,
+      driverLongitude: live.driverLongitude,
       providerPayloadLast: payload ?? null,
       failureCode:
         targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
@@ -315,6 +329,57 @@ export class MobilityApprovalService {
       proposalId: (proposal as any)._id.toString(),
       bookingId: (booking as any)?._id?.toString() ?? null,
       status: targetStatus,
+      tripStatus: (booking as any)?.tripStatus ?? null,
+    };
+  }
+
+  async acceptDriver(userId: string, bookingId: string) {
+    const booking = await this.bookingService.acceptDriver(bookingId, userId);
+
+    const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
+    if (!proposal) {
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Proposal not found',
+      });
+    }
+
+    if (proposal.status !== 'ACCEPTED') {
+      proposal.status = 'ACCEPTED';
+      await proposal.save();
+    }
+
+    return {
+      ok: true,
+      bookingId: (booking as any)._id.toString(),
+      proposalId: booking.proposalId,
+      status: booking.status,
+      tripStatus: booking.tripStatus,
+    };
+  }
+
+  async rejectDriver(userId: string, bookingId: string) {
+    const booking = await this.bookingService.rejectDriver(bookingId, userId);
+
+    const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
+    if (!proposal) {
+      throw new NotFoundException({
+        code: 'PROPOSAL_NOT_FOUND',
+        message: 'Proposal not found',
+      });
+    }
+
+    if (proposal.status !== 'REJECTED') {
+      proposal.status = 'REJECTED';
+      await proposal.save();
+    }
+
+    return {
+      ok: true,
+      bookingId: (booking as any)._id.toString(),
+      proposalId: booking.proposalId,
+      status: booking.status,
+      tripStatus: booking.tripStatus,
     };
   }
 
@@ -489,6 +554,35 @@ export class MobilityApprovalService {
 
   private isTerminalStatus(status: string): boolean {
     return this.terminalStatuses.has(status);
+  }
+
+  private extractLiveProviderFields(payload?: Record<string, unknown>) {
+    const tripStatus = this.stringOrNull(payload?.tripStatus) ?? this.stringOrNull(payload?.status);
+
+    const driver = (payload?.driver ?? {}) as Record<string, unknown>;
+    const vehicle = (payload?.vehicle ?? {}) as Record<string, unknown>;
+    const location =
+      ((payload?.driverLocation ?? payload?.location) as Record<string, unknown>) ??
+      {};
+
+    return {
+      tripStatus,
+      driverName: this.stringOrNull(payload?.driverName) ?? this.stringOrNull(driver.name),
+      driverPhone: this.stringOrNull(payload?.driverPhone) ?? this.stringOrNull(driver.phone),
+      vehiclePlate: this.stringOrNull(payload?.vehiclePlate) ?? this.stringOrNull(vehicle.plate),
+      vehicleModel: this.stringOrNull(payload?.vehicleModel) ?? this.stringOrNull(vehicle.model),
+      etaMinutes: this.numberOrNull(payload?.etaMinutes) ?? this.numberOrNull(driver.etaMinutes),
+      driverLatitude: this.numberOrNull(payload?.driverLatitude) ?? this.numberOrNull(location.latitude),
+      driverLongitude: this.numberOrNull(payload?.driverLongitude) ?? this.numberOrNull(location.longitude),
+    };
+  }
+
+  private stringOrNull(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value : null;
+  }
+
+  private numberOrNull(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
   }
 
   private logEvent(event: string, payload: Record<string, unknown>) {

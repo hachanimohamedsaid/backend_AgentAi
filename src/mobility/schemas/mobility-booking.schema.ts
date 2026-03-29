@@ -49,8 +49,29 @@ export class MobilityBooking {
   @Prop({ type: String, default: null })
   providerBookingRef: string | null;
 
+  @Prop({ type: String, default: null })
+  tripStatus: string | null;
+
+  @Prop({ type: String, default: null })
+  driverName: string | null;
+
+  @Prop({ type: String, default: null })
+  driverPhone: string | null;
+
+  @Prop({ type: String, default: null })
+  vehiclePlate: string | null;
+
+  @Prop({ type: String, default: null })
+  vehicleModel: string | null;
+
   @Prop({ type: Object, default: null })
   providerPayloadLast: Record<string, unknown> | null;
+
+  @Prop({ type: Number, default: null })
+  driverLatitude: number | null;
+
+  @Prop({ type: Number, default: null })
+  driverLongitude: number | null;
 
   @Prop({ type: String, default: null })
   errorMessage: string | null;

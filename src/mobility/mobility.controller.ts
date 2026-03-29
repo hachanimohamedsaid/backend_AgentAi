@@ -177,11 +177,37 @@ export class MobilityController {
       provider: booking.provider,
       status: booking.status,
       providerBookingRef: booking.providerBookingRef ?? null,
+      tripStatus: booking.tripStatus ?? null,
+      driverName: booking.driverName ?? null,
+      driverPhone: booking.driverPhone ?? null,
+      vehiclePlate: booking.vehiclePlate ?? null,
+      vehicleModel: booking.vehicleModel ?? null,
+      etaMinutes: booking.etaMinutes ?? null,
+      driverLatitude: booking.driverLatitude ?? null,
+      driverLongitude: booking.driverLongitude ?? null,
       failureCode: booking.failureCode ?? null,
       failureMessage: booking.failureMessage ?? booking.errorMessage ?? null,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
     }));
+  }
+
+  @Post('bookings/:id/accept-driver')
+  async acceptDriver(
+    @CurrentUser() user: UserDocument,
+    @Param('id') bookingId: string,
+  ) {
+    const userId = (user as any)._id?.toString();
+    return this.approvalService.acceptDriver(userId, bookingId);
+  }
+
+  @Post('bookings/:id/reject-driver')
+  async rejectDriver(
+    @CurrentUser() user: UserDocument,
+    @Param('id') bookingId: string,
+  ) {
+    const userId = (user as any)._id?.toString();
+    return this.approvalService.rejectDriver(userId, bookingId);
   }
 
   @Post('providers/uber/webhook')
