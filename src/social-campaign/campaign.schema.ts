@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema } from 'mongoose';
 
 export type CampaignDocument = Campaign & Document;
 
@@ -33,8 +33,8 @@ export class Campaign {
   @Prop({ type: [String], required: true })
   platforms: string[];
 
-  @Prop({ type: Object, default: {} })
-  campaignResult: Record<string, unknown>;
+  @Prop({ type: MongooseSchema.Types.Mixed, default: null })
+  campaignResult: unknown;
 
   @Prop({ required: true, enum: CampaignStatus, default: CampaignStatus.Generating })
   status: string;

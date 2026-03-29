@@ -112,10 +112,8 @@ export class SocialCampaignService {
         ),
       );
 
-      const result: Record<string, unknown> =
-        response.data && typeof response.data === 'object'
-          ? (response.data as Record<string, unknown>)
-          : { raw: response.data };
+      const result: unknown =
+        response.data !== undefined ? response.data : null;
 
       await this.campaignModel.findByIdAndUpdate(campaignId, {
         status: CampaignStatus.Completed,
