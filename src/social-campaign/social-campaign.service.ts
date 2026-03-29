@@ -15,7 +15,7 @@ import { CampaignBriefDto } from './dto/campaign-brief.dto';
 import { SendCampaignDto } from './dto/send-campaign.dto';
 import { UpdateCampaignResultDto } from './dto/update-campaign-result.dto';
 
-const N8N_TIMEOUT_MS = 120_000;
+const N8N_TIMEOUT_MS = 300_000;
 const EMAIL_TIMEOUT_MS = 30_000;
 
 @Injectable()
@@ -123,6 +123,19 @@ export class SocialCampaignService {
       this.logger.log(`Campaign [${campaignId}] completed successfully`);
     } catch (err: any) {
       const errMsg = err?.message ?? 'Unknown error';
+      const errCode = err?.code;
+      const isTimeout =
+        errCode === 'ECONNABORTED' ||
+        errMsg.toLowerCase().includes('timeout');
+
+      if (isTimeout) {
+        // Do not fail early on timeout; n8n may still finish and callback /:id/result.
+        this.logger.warn(
+          `N8N call timed out for campaign [${campaignId}] after ${N8N_TIMEOUT_MS}ms. Keeping status as generating.`,
+        );
+        return;
+      }
+
       this.logger.error(`N8N call failed for campaign [${campaignId}]: ${errMsg}`);
 
       await this.campaignModel.findByIdAndUpdate(campaignId, {
