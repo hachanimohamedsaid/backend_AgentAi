@@ -447,6 +447,14 @@ export class MobilityApprovalService {
 
     if (!dispatchUrl) {
       const localRef = `local-${proposalId}-${Date.now()}`;
+      const fallbackLat =
+        proposal.fromCoordinates?.latitude ??
+        proposal.toCoordinates?.latitude ??
+        null;
+      const fallbackLng =
+        proposal.fromCoordinates?.longitude ??
+        proposal.toCoordinates?.longitude ??
+        null;
       this.logEvent('mobility.provider.response', {
         proposalId,
         bookingId,
@@ -458,9 +466,31 @@ export class MobilityApprovalService {
 
       await this.handleProviderEvent(proposalId, 'DRIVER_ACCEPTED', {
         providerBookingRef: localRef,
+        tripStatus: 'AWAITING_USER_DECISION',
+        driverName: 'Local Driver',
+        driverPhone: '+21600000000',
+        vehiclePlate: 'LOCAL-0000',
+        vehicleModel: 'Fallback Sedan',
+        driverLatitude: fallbackLat,
+        driverLongitude: fallbackLng,
+        etaMinutes: proposal.best?.etaMinutes ?? null,
         raw: {
           mode: 'local-fallback',
           reason: 'Provider dispatch URL not configured',
+          trip_status: 'AWAITING_USER_DECISION',
+          driver: {
+            name: 'Local Driver',
+            phone: '+21600000000',
+            eta_minutes: proposal.best?.etaMinutes ?? null,
+            location: {
+              lat: fallbackLat,
+              lng: fallbackLng,
+            },
+          },
+          vehicle: {
+            plate: 'LOCAL-0000',
+            model: 'Fallback Sedan',
+          },
         },
       });
       return;
@@ -607,6 +637,11 @@ export class MobilityApprovalService {
       return;
     }
 
+    // Local fallback bookings are managed fully in-app; do not call external provider.
+    if (typeof booking.providerBookingRef === 'string' && booking.providerBookingRef.startsWith('local-')) {
+      return;
+    }
+
     const token =
       this.configService.get<string>('PROVIDER_API_KEY') ??
       this.configService.get<string>('UBER_SERVER_TOKEN');
@@ -633,13 +668,19 @@ export class MobilityApprovalService {
         },
       );
     } catch (error) {
-      throw new ConflictException({
-        code: 'PROVIDER_DECISION_FAILED',
-        message:
+      this.logEvent('mobility.driver.decision.provider_failed', {
+        action,
+        bookingId: booking._id ? String(booking._id) : null,
+        proposalId: booking.proposalId,
+        providerBookingRef: booking.providerBookingRef ?? null,
+        errorMessage:
           error instanceof Error
             ? error.message
             : `Failed to ${action} driver with provider`,
       });
+
+      // Do not block local app flow when provider decision endpoint is unavailable.
+      return;
     }
   }
 

@@ -49,6 +49,10 @@ describe('MobilityApprovalService', () => {
       'DRIVER_ACCEPTED',
       expect.objectContaining({
         providerBookingRef: expect.stringMatching(/^local-prop-fallback-/),
+        tripStatus: 'AWAITING_USER_DECISION',
+        driverName: 'Local Driver',
+        driverPhone: '+21600000000',
+        vehiclePlate: 'LOCAL-0000',
       }),
     );
   });

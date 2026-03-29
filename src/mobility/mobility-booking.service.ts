@@ -111,7 +111,13 @@ export class MobilityBookingService {
   }
 
   async findByIdForUser(bookingId: string, userId: string) {
-    return this.bookingModel.findOne({ _id: bookingId, userId }).exec();
+    const byId = await this.bookingModel.findOne({ _id: bookingId, userId }).exec();
+    if (byId) {
+      return byId;
+    }
+
+    // Compatibility path: some clients may send proposalId instead of bookingId.
+    return this.bookingModel.findOne({ proposalId: bookingId, userId }).exec();
   }
 
   async acceptDriver(bookingId: string, userId: string) {
