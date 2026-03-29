@@ -151,6 +151,54 @@ describe('MobilityApprovalService', () => {
     });
   });
 
+  it('handleProviderEvent extracts driver fields from nested raw payload', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const proposal = {
+      _id: { toString: () => 'prop-raw' },
+      userId: 'user-1',
+      status: 'PENDING_PROVIDER',
+      selectedProvider: 'uberx',
+      best: { provider: 'uberx' },
+      save,
+    } as any;
+
+    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    bookingService.updateStatusByProposalId.mockResolvedValue({ _id: { toString: () => 'book-raw' } });
+
+    await service.handleProviderEvent('prop-raw', 'DRIVER_ACCEPTED', {
+      providerBookingRef: 'prov-raw',
+      raw: {
+        trip_status: 'AWAITING_USER_DECISION',
+        driver: {
+          first_name: 'Ahmed',
+          last_name: 'Ben Salah',
+          phone_number: '+21690000000',
+          eta_minutes: '4',
+          location: { lat: '25.20123', lng: '55.27111' },
+        },
+        vehicle: {
+          license_plate: '234 TUN 4567',
+          car_model: 'Toyota Corolla',
+        },
+      },
+    });
+
+    expect(bookingService.updateStatusByProposalId).toHaveBeenCalledWith(
+      'prop-raw',
+      'ACCEPTED',
+      expect.objectContaining({
+        tripStatus: 'AWAITING_USER_DECISION',
+        driverName: 'Ahmed Ben Salah',
+        driverPhone: '+21690000000',
+        vehiclePlate: '234 TUN 4567',
+        vehicleModel: 'Toyota Corolla',
+        etaMinutes: 4,
+        driverLatitude: 25.20123,
+        driverLongitude: 55.27111,
+      }),
+    );
+  });
+
   it('handleProviderEvent does not regress terminal proposal', async () => {
     const save = jest.fn().mockResolvedValue(undefined);
     const proposal = {

@@ -241,7 +241,9 @@ export class MobilityApprovalService {
     const normalized = eventType.toUpperCase();
     const live = this.extractLiveProviderFields(payload);
     const decisionRequiredFromProvider =
-      live.tripStatus === 'DRIVER_PROPOSED' || live.tripStatus === 'AWAITING_USER_CONFIRMATION';
+      live.tripStatus === 'DRIVER_PROPOSED' ||
+      live.tripStatus === 'AWAITING_USER_CONFIRMATION' ||
+      live.tripStatus === 'AWAITING_USER_DECISION';
     let targetStatus: 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'EXPIRED' | 'COMPLETED';
 
     if (normalized === 'DRIVER_ACCEPTED') {
@@ -642,24 +644,101 @@ export class MobilityApprovalService {
   }
 
   private extractLiveProviderFields(payload?: Record<string, unknown>) {
-    const tripStatus = this.stringOrNull(payload?.tripStatus) ?? this.stringOrNull(payload?.status);
+    const raw = this.objectOrEmpty(payload?.raw);
+    const driver = this.objectOrEmpty(payload?.driver ?? raw.driver);
+    const vehicle = this.objectOrEmpty(payload?.vehicle ?? raw.vehicle);
+    const location = this.objectOrEmpty(
+      payload?.driverLocation ??
+        payload?.location ??
+        raw.driverLocation ??
+        raw.location ??
+        this.objectOrEmpty(driver.location),
+    );
 
-    const driver = (payload?.driver ?? {}) as Record<string, unknown>;
-    const vehicle = (payload?.vehicle ?? {}) as Record<string, unknown>;
-    const location =
-      ((payload?.driverLocation ?? payload?.location) as Record<string, unknown>) ??
-      {};
+    const firstName =
+      this.stringOrNull(payload?.driverFirstName) ??
+      this.stringOrNull(raw.driverFirstName) ??
+      this.stringOrNull(driver.firstName) ??
+      this.stringOrNull(driver.first_name);
+    const lastName =
+      this.stringOrNull(payload?.driverLastName) ??
+      this.stringOrNull(raw.driverLastName) ??
+      this.stringOrNull(driver.lastName) ??
+      this.stringOrNull(driver.last_name);
+
+    const fullName =
+      this.stringOrNull(payload?.driverName) ??
+      this.stringOrNull(raw.driverName) ??
+      this.stringOrNull(driver.name) ??
+      this.stringOrNull(driver.fullName) ??
+      this.stringOrNull(driver.full_name) ??
+      (firstName || lastName ? `${firstName ?? ''} ${lastName ?? ''}`.trim() : null);
+
+    const tripStatus =
+      this.stringOrNull(payload?.tripStatus) ??
+      this.stringOrNull(payload?.trip_status) ??
+      this.stringOrNull(payload?.status) ??
+      this.stringOrNull(raw.tripStatus) ??
+      this.stringOrNull(raw.trip_status) ??
+      this.stringOrNull(raw.state) ??
+      this.stringOrNull(raw.status);
 
     return {
       tripStatus,
-      driverName: this.stringOrNull(payload?.driverName) ?? this.stringOrNull(driver.name),
-      driverPhone: this.stringOrNull(payload?.driverPhone) ?? this.stringOrNull(driver.phone),
-      vehiclePlate: this.stringOrNull(payload?.vehiclePlate) ?? this.stringOrNull(vehicle.plate),
-      vehicleModel: this.stringOrNull(payload?.vehicleModel) ?? this.stringOrNull(vehicle.model),
-      etaMinutes: this.numberOrNull(payload?.etaMinutes) ?? this.numberOrNull(driver.etaMinutes),
-      driverLatitude: this.numberOrNull(payload?.driverLatitude) ?? this.numberOrNull(location.latitude),
-      driverLongitude: this.numberOrNull(payload?.driverLongitude) ?? this.numberOrNull(location.longitude),
+      driverName: fullName,
+      driverPhone:
+        this.stringOrNull(payload?.driverPhone) ??
+        this.stringOrNull(payload?.driver_phone) ??
+        this.stringOrNull(raw.driverPhone) ??
+        this.stringOrNull(raw.driver_phone) ??
+        this.stringOrNull(driver.phone) ??
+        this.stringOrNull(driver.phoneNumber) ??
+        this.stringOrNull(driver.phone_number),
+      vehiclePlate:
+        this.stringOrNull(payload?.vehiclePlate) ??
+        this.stringOrNull(payload?.vehicle_plate) ??
+        this.stringOrNull(raw.vehiclePlate) ??
+        this.stringOrNull(raw.vehicle_plate) ??
+        this.stringOrNull(vehicle.plate) ??
+        this.stringOrNull(vehicle.licensePlate) ??
+        this.stringOrNull(vehicle.license_plate),
+      vehicleModel:
+        this.stringOrNull(payload?.vehicleModel) ??
+        this.stringOrNull(payload?.vehicle_model) ??
+        this.stringOrNull(raw.vehicleModel) ??
+        this.stringOrNull(raw.vehicle_model) ??
+        this.stringOrNull(vehicle.model) ??
+        this.stringOrNull(vehicle.carModel) ??
+        this.stringOrNull(vehicle.car_model),
+      etaMinutes:
+        this.numberOrNull(payload?.etaMinutes) ??
+        this.numberOrNull(payload?.eta_minutes) ??
+        this.numberOrNull(raw.etaMinutes) ??
+        this.numberOrNull(raw.eta_minutes) ??
+        this.numberOrNull(driver.etaMinutes) ??
+        this.numberOrNull(driver.eta_minutes) ??
+        this.numberOrNull(raw.eta),
+      driverLatitude:
+        this.numberOrNull(payload?.driverLatitude) ??
+        this.numberOrNull(payload?.driver_latitude) ??
+        this.numberOrNull(raw.driverLatitude) ??
+        this.numberOrNull(raw.driver_latitude) ??
+        this.numberOrNull(location.latitude) ??
+        this.numberOrNull(location.lat),
+      driverLongitude:
+        this.numberOrNull(payload?.driverLongitude) ??
+        this.numberOrNull(payload?.driver_longitude) ??
+        this.numberOrNull(raw.driverLongitude) ??
+        this.numberOrNull(raw.driver_longitude) ??
+        this.numberOrNull(location.longitude) ??
+        this.numberOrNull(location.lng),
     };
+  }
+
+  private objectOrEmpty(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 
   private stringOrNull(value: unknown): string | null {
@@ -667,7 +746,16 @@ export class MobilityApprovalService {
   }
 
   private numberOrNull(value: unknown): number | null {
-    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
   }
 
   private logEvent(event: string, payload: Record<string, unknown>) {

@@ -123,10 +123,16 @@ export class MobilityBookingService {
       });
     }
 
+    const pendingUserDecisionStates = [
+      'DRIVER_PROPOSED',
+      'AWAITING_USER_CONFIRMATION',
+      'AWAITING_USER_DECISION',
+    ];
+    const tripStatus = booking.tripStatus ?? '';
     const decisionable =
       booking.status === 'ACCEPTED' &&
-      booking.userDecisionRequired === true &&
-      ['DRIVER_PROPOSED', 'AWAITING_USER_CONFIRMATION'].includes(booking.tripStatus ?? '');
+      ((booking.userDecisionRequired === true && pendingUserDecisionStates.includes(tripStatus)) ||
+        (booking.userDecisionRequired !== true && pendingUserDecisionStates.includes(tripStatus)));
     if (!decisionable) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',
@@ -153,10 +159,16 @@ export class MobilityBookingService {
       });
     }
 
+    const pendingUserDecisionStates = [
+      'DRIVER_PROPOSED',
+      'AWAITING_USER_CONFIRMATION',
+      'AWAITING_USER_DECISION',
+    ];
+    const tripStatus = booking.tripStatus ?? '';
     const decisionable =
       booking.status === 'ACCEPTED' &&
-      booking.userDecisionRequired === true &&
-      ['DRIVER_PROPOSED', 'AWAITING_USER_CONFIRMATION'].includes(booking.tripStatus ?? '');
+      ((booking.userDecisionRequired === true && pendingUserDecisionStates.includes(tripStatus)) ||
+        (booking.userDecisionRequired !== true && pendingUserDecisionStates.includes(tripStatus)));
     if (!decisionable) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',

@@ -152,4 +152,29 @@ describe('MobilityBookingService', () => {
     expect(booking.failureCode).toBe('USER_REJECTED_DRIVER');
     expect(save).toHaveBeenCalled();
   });
+
+  it('acceptDriver supports AWAITING_USER_DECISION state', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const booking = {
+      _id: { toString: () => 'book-3' },
+      proposalId: 'prop-3',
+      status: 'ACCEPTED',
+      tripStatus: 'AWAITING_USER_DECISION',
+      userDecisionRequired: false,
+      userDriverDecision: null,
+      failureCode: null,
+      failureMessage: null,
+      errorMessage: null,
+      save,
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+
+    const res = await service.acceptDriver('book-3', 'user-1');
+
+    expect(res).toBe(booking);
+    expect(booking.tripStatus).toBe('DRIVER_ARRIVING');
+    expect(booking.userDecisionRequired).toBe(false);
+    expect(booking.userDriverDecision).toBe('ACCEPTED');
+    expect(save).toHaveBeenCalled();
+  });
 });
