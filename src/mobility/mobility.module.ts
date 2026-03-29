@@ -2,11 +2,13 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MobilityController } from './mobility.controller';
 import { MobilityProviderSimulatorController } from './mobility-provider-simulator.controller';
+import { MobilityUberAuthController } from './mobility-uber-auth.controller';
 import { MobilityQuotesService } from './mobility-quotes.service';
 import { MobilityPricingEngine } from './mobility-pricing.engine';
 import { MobilityAutomationService } from './mobility-automation.service';
 import { MobilityApprovalService } from './mobility-approval.service';
 import { MobilityBookingService } from './mobility-booking.service';
+import { MobilityUberAuthService } from './mobility-uber-auth.service';
 import { MobilityRule, MobilityRuleSchema } from './schemas/mobility-rule.schema';
 import {
   MobilityQuoteRun,
@@ -35,13 +37,18 @@ import {
       { name: MobilityProviderToken.name, schema: MobilityProviderTokenSchema },
     ]),
   ],
-  controllers: [MobilityController, MobilityProviderSimulatorController],
+  controllers: [
+    MobilityController,
+    MobilityProviderSimulatorController,
+    MobilityUberAuthController,
+  ],
   providers: [
     MobilityQuotesService,
     MobilityPricingEngine,
     MobilityAutomationService,
     MobilityApprovalService,
     MobilityBookingService,
+    MobilityUberAuthService,
   ],
 })
 export class MobilityModule {}
