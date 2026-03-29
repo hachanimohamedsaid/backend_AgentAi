@@ -24,6 +24,35 @@ describe('MobilityApprovalService', () => {
     jest.spyOn<any, any>(service as any, 'enqueueProviderDispatch').mockImplementation(() => undefined);
   });
 
+  it('dispatchProviderRequest falls back to local accepted when provider URL is missing', async () => {
+    const proposal = {
+      _id: { toString: () => 'prop-fallback' },
+      status: 'PENDING_PROVIDER',
+      selectedProvider: 'uberx',
+      best: { provider: 'uberx' },
+      from: 'A',
+      to: 'B',
+      pickupAt: new Date(),
+    } as any;
+
+    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    configService.get.mockReturnValue(undefined);
+
+    const handleSpy = jest
+      .spyOn(service as any, 'handleProviderEvent')
+      .mockResolvedValue({ ok: true, status: 'ACCEPTED' });
+
+    await (service as any).dispatchProviderRequest('prop-fallback', 'book-fallback', 'user-1');
+
+    expect(handleSpy).toHaveBeenCalledWith(
+      'prop-fallback',
+      'DRIVER_ACCEPTED',
+      expect.objectContaining({
+        providerBookingRef: expect.stringMatching(/^local-prop-fallback-/),
+      }),
+    );
+  });
+
   it('confirm is idempotent when already pending provider', async () => {
     const proposal = {
       _id: { toString: () => 'prop-1' },

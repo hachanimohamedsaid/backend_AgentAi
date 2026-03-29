@@ -351,16 +351,22 @@ export class MobilityApprovalService {
     const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
 
     if (!dispatchUrl) {
-      this.logEvent('mobility.dispatch.failed', {
+      const localRef = `local-${proposalId}-${Date.now()}`;
+      this.logEvent('mobility.provider.response', {
         proposalId,
         bookingId,
         userId,
-        errorCode: 'PROVIDER_CONFIG_MISSING',
-        errorMessage: 'Provider dispatch URL not configured',
+        provider: proposal.selectedProvider ?? proposal.best.provider,
+        providerStatus: 'ACCEPTED_LOCAL',
+        providerBookingRef: localRef,
       });
-      await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
-        errorCode: 'PROVIDER_CONFIG_MISSING',
-        errorMessage: 'Provider dispatch URL not configured',
+
+      await this.handleProviderEvent(proposalId, 'DRIVER_ACCEPTED', {
+        providerBookingRef: localRef,
+        raw: {
+          mode: 'local-fallback',
+          reason: 'Provider dispatch URL not configured',
+        },
       });
       return;
     }
