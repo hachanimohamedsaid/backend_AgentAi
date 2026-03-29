@@ -100,4 +100,56 @@ describe('MobilityBookingService', () => {
     expect(booking.errorMessage).toBe('Provider internal error');
     expect(save).toHaveBeenCalled();
   });
+
+  it('acceptDriver requires user decision and marks decision accepted', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const booking = {
+      _id: { toString: () => 'book-1' },
+      proposalId: 'prop-1',
+      status: 'ACCEPTED',
+      tripStatus: 'AWAITING_USER_CONFIRMATION',
+      userDecisionRequired: true,
+      userDriverDecision: null,
+      failureCode: null,
+      failureMessage: null,
+      errorMessage: null,
+      save,
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+
+    const res = await service.acceptDriver('book-1', 'user-1');
+
+    expect(res).toBe(booking);
+    expect(booking.tripStatus).toBe('DRIVER_ARRIVING');
+    expect(booking.userDecisionRequired).toBe(false);
+    expect(booking.userDriverDecision).toBe('ACCEPTED');
+    expect(save).toHaveBeenCalled();
+  });
+
+  it('rejectDriver marks booking rejected and decision rejected', async () => {
+    const save = jest.fn().mockResolvedValue(undefined);
+    const booking = {
+      _id: { toString: () => 'book-2' },
+      proposalId: 'prop-2',
+      status: 'ACCEPTED',
+      tripStatus: 'DRIVER_PROPOSED',
+      userDecisionRequired: true,
+      userDriverDecision: null,
+      failureCode: null,
+      failureMessage: null,
+      errorMessage: null,
+      save,
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+
+    const res = await service.rejectDriver('book-2', 'user-1');
+
+    expect(res).toBe(booking);
+    expect(booking.status).toBe('REJECTED');
+    expect(booking.tripStatus).toBe('CANCELED_BY_USER');
+    expect(booking.userDecisionRequired).toBe(false);
+    expect(booking.userDriverDecision).toBe('REJECTED');
+    expect(booking.failureCode).toBe('USER_REJECTED_DRIVER');
+    expect(save).toHaveBeenCalled();
+  });
 });

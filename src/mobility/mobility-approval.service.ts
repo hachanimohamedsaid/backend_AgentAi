@@ -240,6 +240,8 @@ export class MobilityApprovalService {
 
     const normalized = eventType.toUpperCase();
     const live = this.extractLiveProviderFields(payload);
+    const decisionRequiredFromProvider =
+      live.tripStatus === 'DRIVER_PROPOSED' || live.tripStatus === 'AWAITING_USER_CONFIRMATION';
     let targetStatus: 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'EXPIRED' | 'COMPLETED';
 
     if (normalized === 'DRIVER_ACCEPTED') {
@@ -288,6 +290,10 @@ export class MobilityApprovalService {
           : targetStatus === 'COMPLETED'
             ? 'COMPLETED'
             : live.tripStatus,
+      userDecisionRequired:
+        targetStatus === 'ACCEPTED' ? decisionRequiredFromProvider : false,
+      userDriverDecision:
+        targetStatus === 'ACCEPTED' ? null : null,
       driverName: live.driverName,
       driverPhone: live.driverPhone,
       vehiclePlate: live.vehiclePlate,
@@ -334,6 +340,15 @@ export class MobilityApprovalService {
   }
 
   async acceptDriver(userId: string, bookingId: string) {
+    const currentBooking = await this.bookingService.findByIdForUser(bookingId, userId);
+    if (!currentBooking) {
+      throw new NotFoundException({
+        code: 'BOOKING_NOT_FOUND',
+        message: 'Booking not found',
+      });
+    }
+
+    await this.callProviderDriverDecision('accept', currentBooking);
     const booking = await this.bookingService.acceptDriver(bookingId, userId);
 
     const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
@@ -355,10 +370,21 @@ export class MobilityApprovalService {
       proposalId: booking.proposalId,
       status: booking.status,
       tripStatus: booking.tripStatus,
+      userDecisionRequired: booking.userDecisionRequired,
+      userDriverDecision: booking.userDriverDecision,
     };
   }
 
   async rejectDriver(userId: string, bookingId: string) {
+    const currentBooking = await this.bookingService.findByIdForUser(bookingId, userId);
+    if (!currentBooking) {
+      throw new NotFoundException({
+        code: 'BOOKING_NOT_FOUND',
+        message: 'Booking not found',
+      });
+    }
+
+    await this.callProviderDriverDecision('reject', currentBooking);
     const booking = await this.bookingService.rejectDriver(bookingId, userId);
 
     const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
@@ -380,6 +406,8 @@ export class MobilityApprovalService {
       proposalId: booking.proposalId,
       status: booking.status,
       tripStatus: booking.tripStatus,
+      userDecisionRequired: booking.userDecisionRequired,
+      userDriverDecision: booking.userDriverDecision,
     };
   }
 
@@ -554,6 +582,63 @@ export class MobilityApprovalService {
 
   private isTerminalStatus(status: string): boolean {
     return this.terminalStatuses.has(status);
+  }
+
+  private async callProviderDriverDecision(
+    action: 'accept' | 'reject',
+    booking: {
+      _id?: unknown;
+      proposalId: string;
+      provider: string;
+      providerBookingRef?: string | null;
+      userId: string;
+      tripStatus?: string | null;
+    },
+  ) {
+    const base = this.configService.get<string>('PROVIDER_BASE_URL');
+    const explicitUrl = this.configService.get<string>(
+      action === 'accept' ? 'PROVIDER_ACCEPT_DRIVER_URL' : 'PROVIDER_REJECT_DRIVER_URL',
+    );
+
+    const url = explicitUrl ?? (base ? `${base.replace(/\/$/, '')}/driver/${action}` : null);
+    if (!url) {
+      return;
+    }
+
+    const token =
+      this.configService.get<string>('PROVIDER_API_KEY') ??
+      this.configService.get<string>('UBER_SERVER_TOKEN');
+    const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
+
+    try {
+      await axios.post(
+        url,
+        {
+          action,
+          bookingId: booking._id ? String(booking._id) : null,
+          proposalId: booking.proposalId,
+          provider: booking.provider,
+          providerBookingRef: booking.providerBookingRef ?? null,
+          userId: booking.userId,
+          tripStatus: booking.tripStatus ?? null,
+        },
+        {
+          timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    } catch (error) {
+      throw new ConflictException({
+        code: 'PROVIDER_DECISION_FAILED',
+        message:
+          error instanceof Error
+            ? error.message
+            : `Failed to ${action} driver with provider`,
+      });
+    }
   }
 
   private extractLiveProviderFields(payload?: Record<string, unknown>) {

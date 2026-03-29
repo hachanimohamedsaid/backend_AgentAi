@@ -178,6 +178,8 @@ export class MobilityController {
       status: booking.status,
       providerBookingRef: booking.providerBookingRef ?? null,
       tripStatus: booking.tripStatus ?? null,
+      userDecisionRequired: booking.userDecisionRequired ?? false,
+      userDriverDecision: booking.userDriverDecision ?? null,
       driverName: booking.driverName ?? null,
       driverPhone: booking.driverPhone ?? null,
       vehiclePlate: booking.vehiclePlate ?? null,

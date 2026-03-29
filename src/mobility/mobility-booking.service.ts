@@ -36,6 +36,8 @@ export class MobilityBookingService {
             etaMinutes: proposal.best.etaMinutes,
             providerBookingRef: null,
             tripStatus: null,
+            userDecisionRequired: false,
+            userDriverDecision: null,
             driverName: null,
             driverPhone: null,
             vehiclePlate: null,
@@ -62,6 +64,8 @@ export class MobilityBookingService {
       providerBookingRef?: string | null;
       providerPayloadLast?: Record<string, unknown> | null;
       tripStatus?: string | null;
+      userDecisionRequired?: boolean;
+      userDriverDecision?: 'ACCEPTED' | 'REJECTED' | null;
       driverName?: string | null;
       driverPhone?: string | null;
       vehiclePlate?: string | null;
@@ -90,6 +94,8 @@ export class MobilityBookingService {
     booking.providerBookingRef = options?.providerBookingRef ?? booking.providerBookingRef ?? null;
     booking.providerPayloadLast = options?.providerPayloadLast ?? booking.providerPayloadLast ?? null;
     booking.tripStatus = options?.tripStatus ?? booking.tripStatus ?? null;
+    booking.userDecisionRequired = options?.userDecisionRequired ?? booking.userDecisionRequired ?? false;
+    booking.userDriverDecision = options?.userDriverDecision ?? booking.userDriverDecision ?? null;
     booking.driverName = options?.driverName ?? booking.driverName ?? null;
     booking.driverPhone = options?.driverPhone ?? booking.driverPhone ?? null;
     booking.vehiclePlate = options?.vehiclePlate ?? booking.vehiclePlate ?? null;
@@ -119,6 +125,7 @@ export class MobilityBookingService {
 
     const decisionable =
       booking.status === 'ACCEPTED' &&
+      booking.userDecisionRequired === true &&
       ['DRIVER_PROPOSED', 'AWAITING_USER_CONFIRMATION'].includes(booking.tripStatus ?? '');
     if (!decisionable) {
       throw new ConflictException({
@@ -128,6 +135,8 @@ export class MobilityBookingService {
     }
 
     booking.tripStatus = 'DRIVER_ARRIVING';
+    booking.userDecisionRequired = false;
+    booking.userDriverDecision = 'ACCEPTED';
     booking.failureCode = null;
     booking.failureMessage = null;
     booking.errorMessage = null;
@@ -146,6 +155,7 @@ export class MobilityBookingService {
 
     const decisionable =
       booking.status === 'ACCEPTED' &&
+      booking.userDecisionRequired === true &&
       ['DRIVER_PROPOSED', 'AWAITING_USER_CONFIRMATION'].includes(booking.tripStatus ?? '');
     if (!decisionable) {
       throw new ConflictException({
@@ -156,6 +166,8 @@ export class MobilityBookingService {
 
     booking.status = 'REJECTED';
     booking.tripStatus = 'CANCELED_BY_USER';
+    booking.userDecisionRequired = false;
+    booking.userDriverDecision = 'REJECTED';
     booking.failureCode = 'USER_REJECTED_DRIVER';
     booking.failureMessage = 'Driver rejected by user';
     booking.errorMessage = 'Driver rejected by user';

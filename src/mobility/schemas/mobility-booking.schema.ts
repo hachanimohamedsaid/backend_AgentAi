@@ -52,6 +52,12 @@ export class MobilityBooking {
   @Prop({ type: String, default: null })
   tripStatus: string | null;
 
+  @Prop({ type: Boolean, default: false })
+  userDecisionRequired: boolean;
+
+  @Prop({ type: String, enum: ['ACCEPTED', 'REJECTED'], default: null })
+  userDriverDecision: 'ACCEPTED' | 'REJECTED' | null;
+
   @Prop({ type: String, default: null })
   driverName: string | null;
 
