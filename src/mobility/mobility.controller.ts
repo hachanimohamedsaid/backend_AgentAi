@@ -177,6 +177,8 @@ export class MobilityController {
       provider: booking.provider,
       status: booking.status,
       providerBookingRef: booking.providerBookingRef ?? null,
+      failureCode: booking.failureCode ?? null,
+      failureMessage: booking.failureMessage ?? booking.errorMessage ?? null,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
     }));
