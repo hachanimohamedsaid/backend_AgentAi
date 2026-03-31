@@ -19,6 +19,7 @@ import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
+import { RewardsService } from '../rewards/rewards.service';
 
 @Controller('billing')
 export class BillingController {
@@ -28,6 +29,7 @@ export class BillingController {
 
   constructor(
     private readonly billing: BillingService,
+    private readonly rewardsService: RewardsService,
     private readonly configService: ConfigService,
   ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -49,9 +51,23 @@ export class BillingController {
     @CurrentUser() user: UserDocument,
   ) {
     const userId = (user as any)._id?.toString();
+    let couponCode: string | undefined;
+    let discountPercent: number | undefined;
+
+    if (dto.couponCode) {
+      const validation = await this.rewardsService.validateCouponForUser(
+        dto.couponCode,
+        userId,
+      );
+      couponCode = validation.code;
+      discountPercent = validation.discountPercent;
+    }
+
     const url = await this.billing.createSubscriptionCheckoutSession(dto.plan, {
       customerEmail: user.email,
       userId,
+      couponCode,
+      discountPercent,
     });
     return { url };
   }
@@ -71,6 +87,12 @@ export class BillingController {
         const session = await this.stripe.checkout.sessions.retrieve(sessionId);
         if (session.payment_status !== 'paid') {
           throw new Error('Payment not completed');
+        }
+
+        const couponCode = session.metadata?.couponCode;
+        const paidUserId = session.client_reference_id;
+        if (couponCode && paidUserId) {
+          await this.rewardsService.consumeCoupon(couponCode, paidUserId);
         }
       } catch (error) {
         this.logger.warn(`Failed to verify Stripe session: ${String(error)}`);

@@ -74,6 +74,8 @@ export class UsersController {
       challengePoints: user.challengePoints || 0,
       completedChallenges: user.completedChallenges || [],
       isPremium: user.isPremium || false,
+      badges: user.badges || [],
+      championMonths: user.championMonths || [],
     };
   }
 }

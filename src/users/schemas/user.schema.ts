@@ -74,6 +74,12 @@ export class User {
   @Prop({ type: Boolean, default: false })
   isPremium: boolean;
 
+  @Prop({ type: [String], default: [] })
+  badges: string[];
+
+  @Prop({ type: [String], default: [] })
+  championMonths: string[];
+
   createdAt?: Date;
   updatedAt?: Date;
 }

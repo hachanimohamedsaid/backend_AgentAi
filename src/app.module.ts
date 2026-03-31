@@ -20,6 +20,7 @@ import { BillingModule } from './billing/billing.module';
 import { MobilityModule } from './mobility/mobility.module';
 import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 import { ChallengesModule } from './challenges/challenges.module';
+import { RewardsModule } from './rewards/rewards.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { ChallengesModule } from './challenges/challenges.module';
     MobilityModule,
     SocialCampaignModule,
     ChallengesModule,
+    RewardsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

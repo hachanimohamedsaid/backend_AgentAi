@@ -128,6 +128,8 @@ export class AuthController {
     challengePoints: number;
     completedChallenges: string[];
     isPremium: boolean;
+    badges: string[];
+    championMonths: string[];
   }> {
     const obj = user.toJSON ? user.toJSON() : (user as any);
     const id = obj.id ?? (user as any)._id?.toString();
@@ -147,6 +149,8 @@ export class AuthController {
     const completedChallenges =
       obj.completedChallenges ?? (user as any).completedChallenges ?? [];
     const isPremium = obj.isPremium ?? (user as any).isPremium ?? false;
+    const badges = obj.badges ?? (user as any).badges ?? [];
+    const championMonths = obj.championMonths ?? (user as any).championMonths ?? [];
     const daysActive = createdAt
       ? Math.max(
           0,
@@ -176,6 +180,8 @@ export class AuthController {
         ? completedChallenges
         : [],
       isPremium: Boolean(isPremium),
+      badges: Array.isArray(badges) ? badges : [],
+      championMonths: Array.isArray(championMonths) ? championMonths : [],
     };
   }
 

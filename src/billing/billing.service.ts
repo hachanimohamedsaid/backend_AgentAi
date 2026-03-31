@@ -29,7 +29,12 @@ export class BillingService {
 
   async createSubscriptionCheckoutSession(
     plan: 'monthly' | 'yearly',
-    opts?: { customerEmail?: string; userId?: string },
+    opts?: {
+      customerEmail?: string;
+      userId?: string;
+      couponCode?: string;
+      discountPercent?: number;
+    },
   ): Promise<string> {
     const priceId =
       plan === 'yearly'
@@ -51,6 +56,16 @@ export class BillingService {
 
     try {
       const stripe = this.getStripe();
+      let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+      if (opts?.couponCode && opts?.discountPercent) {
+        const stripeCoupon = await stripe.coupons.create({
+          duration: 'once',
+          percent_off: opts.discountPercent,
+          name: `Reward ${opts.couponCode}`,
+        });
+        discounts = [{ coupon: stripeCoupon.id }];
+      }
+
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         line_items: [{ price: priceId, quantity: 1 }],
@@ -58,6 +73,14 @@ export class BillingService {
         cancel_url: cancelUrl,
         ...(opts?.customerEmail ? { customer_email: opts.customerEmail } : {}),
         ...(opts?.userId ? { client_reference_id: opts.userId } : {}),
+        ...(discounts ? { discounts } : {}),
+        ...(opts?.couponCode
+          ? {
+              metadata: {
+                couponCode: opts.couponCode,
+              },
+            }
+          : {}),
       });
 
       if (!session.url) {
