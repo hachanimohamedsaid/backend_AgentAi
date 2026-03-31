@@ -14,6 +14,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserDocument } from '../users/schemas/user.schema';
 import { RewardsService } from './rewards.service';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
+import { ResendMonthlyCouponDto } from './dto/resend-monthly-coupon.dto';
 
 @Controller()
 export class RewardsController {
@@ -43,5 +44,19 @@ export class RewardsController {
       throw new ForbiddenException('forbidden');
     }
     return this.rewardsService.runMonthlyWinnerJob();
+  }
+
+  @Post(['rewards/monthly/resend-email', 'api/rewards/monthly/resend-email'])
+  @HttpCode(HttpStatus.OK)
+  async resendMonthlyRewardEmail(
+    @Headers('x-internal-key') internalKey: string | undefined,
+    @Body() dto: ResendMonthlyCouponDto,
+  ) {
+    const expected = this.configService.get<string>('REWARDS_RUN_SECRET');
+    if (!expected || internalKey !== expected) {
+      throw new ForbiddenException('forbidden');
+    }
+
+    return this.rewardsService.resendMonthlyCouponEmail(dto.email, dto.month);
   }
 }

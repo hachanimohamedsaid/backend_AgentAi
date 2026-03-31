@@ -151,6 +151,52 @@ export class RewardsService {
     return { consumed: Boolean(result), coupon: result ?? null };
   }
 
+  async resendMonthlyCouponEmail(email: string, month?: string) {
+    const targetMonth = month ?? (await this.getLatestWinnerMonth());
+    if (!targetMonth) {
+      throw new BadRequestException('no_monthly_winner_found');
+    }
+
+    const winner = await this.monthlyWinnerModel
+      .findOne({ month: targetMonth })
+      .lean()
+      .exec();
+
+    if (!winner) {
+      throw new BadRequestException('monthly_winner_not_found');
+    }
+
+    const coupon = await this.rewardCouponModel
+      .findOne({ code: winner.couponCode })
+      .lean()
+      .exec();
+
+    if (!coupon) {
+      throw new BadRequestException('monthly_coupon_not_found');
+    }
+
+    const winnerUser = await this.userModel.findById(winner.userId).lean().exec();
+    const winnerName = winnerUser?.name ?? 'Champion';
+
+    await this.sendWinnerCouponEmail({
+      email,
+      name: winnerName,
+      couponCode: coupon.code,
+      month: coupon.month,
+      discountPercent: coupon.discountPercent,
+      expiresAt: coupon.expiresAt,
+    });
+
+    return {
+      status: 'resent',
+      month: coupon.month,
+      email,
+      couponCode: coupon.code,
+      expiresAt: coupon.expiresAt,
+      used: coupon.used,
+    };
+  }
+
   private async findMonthlyWinner(now: Date): Promise<UserDocument | null> {
     const start = this.startOfPreviousMonth(now);
     const end = this.startOfMonth(now);
@@ -175,6 +221,15 @@ export class RewardsService {
       .exec();
 
     return fallback[0] ?? null;
+  }
+
+  private async getLatestWinnerMonth(): Promise<string | null> {
+    const latest = await this.monthlyWinnerModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return latest?.month ?? null;
   }
 
   private async sendWinnerCouponEmail(data: {
