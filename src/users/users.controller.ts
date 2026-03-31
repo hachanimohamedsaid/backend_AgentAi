@@ -12,7 +12,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('users')
+@Controller(['users', 'api/users'])
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -66,7 +66,7 @@ export class UsersController {
       return { error: 'User not found' };
     }
     return {
-      id: user._id,
+      id: user._id?.toString?.() ?? user._id,
       name: user.name,
       email: user.email,
       avatarUrl: user.avatarUrl,

@@ -19,6 +19,7 @@ import { MarketIntelligenceModule } from './market-intelligence/market-intellige
 import { BillingModule } from './billing/billing.module';
 import { MobilityModule } from './mobility/mobility.module';
 import { SocialCampaignModule } from './social-campaign/social-campaign.module';
+import { ChallengesModule } from './challenges/challenges.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { SocialCampaignModule } from './social-campaign/social-campaign.module';
     BillingModule,
     MobilityModule,
     SocialCampaignModule,
+    ChallengesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
