@@ -113,4 +113,41 @@ export class UsersService {
       (user as any).hoursSaved = dto.hoursSaved;
     return user.save();
   }
+
+  // ✨ NEW: Get leaderboard (top 100 users by challenge points)
+  async findLeaderboard(): Promise<UserDocument[]> {
+    return this.userModel
+      .find()
+      .select('id name email avatarUrl challengePoints completedChallenges isPremium _id')
+      .sort({ challengePoints: -1 })
+      .limit(100)
+      .lean()
+      .exec();
+  }
+
+  // ✨ NEW: Complete a challenge and add points
+  async completeChallenge(
+    userId: string,
+    challengeId: string,
+    points: number,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $inc: { challengePoints: points },
+          $addToSet: { completedChallenges: challengeId },
+        },
+        { new: true },
+      )
+      .exec();
+  }
+
+  // ✨ NEW: Get user's challenge data
+  async getUserChallengeData(userId: string) {
+    return this.userModel
+      .findById(userId)
+      .select('challengePoints completedChallenges isPremium')
+      .exec();
+  }
 }

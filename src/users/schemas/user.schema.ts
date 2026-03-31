@@ -65,6 +65,15 @@ export class User {
   @Prop({ type: Date, default: null })
   lastTrainingAt: Date | null;
 
+  @Prop({ type: Number, default: 0 })
+  challengePoints: number;
+
+  @Prop({ type: [String], default: [] })
+  completedChallenges: string[];
+
+  @Prop({ type: Boolean, default: false })
+  isPremium: boolean;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
