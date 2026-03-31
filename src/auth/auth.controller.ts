@@ -125,6 +125,9 @@ export class AuthController {
     daysActive: number;
     hoursSaved: number;
     emailVerified: boolean;
+    challengePoints: number;
+    completedChallenges: string[];
+    isPremium: boolean;
   }> {
     const obj = user.toJSON ? user.toJSON() : (user as any);
     const id = obj.id ?? (user as any)._id?.toString();
@@ -140,6 +143,10 @@ export class AuthController {
     const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
     const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
     const emailVerified = obj.emailVerified ?? (user as any).emailVerified ?? false;
+    const challengePoints = obj.challengePoints ?? (user as any).challengePoints ?? 0;
+    const completedChallenges =
+      obj.completedChallenges ?? (user as any).completedChallenges ?? [];
+    const isPremium = obj.isPremium ?? (user as any).isPremium ?? false;
     const daysActive = createdAt
       ? Math.max(
           0,
@@ -164,6 +171,11 @@ export class AuthController {
       daysActive,
       hoursSaved: Number(hoursSaved),
       emailVerified: Boolean(emailVerified),
+      challengePoints: Number(challengePoints),
+      completedChallenges: Array.isArray(completedChallenges)
+        ? completedChallenges
+        : [],
+      isPremium: Boolean(isPremium),
     };
   }
 

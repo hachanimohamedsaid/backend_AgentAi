@@ -9,6 +9,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
+import { CompleteChallengeDto } from './dto/complete-challenge.dto';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -38,7 +39,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async completeChallenge(
     @Request() req,
-    @Body() body: { challengeId: string; points: number },
+    @Body() body: CompleteChallengeDto,
   ) {
     const updated = await this.usersService.completeChallenge(
       req.user.id,
