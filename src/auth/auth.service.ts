@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
+import axios from 'axios';
 import * as jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
 import { Resend } from 'resend';
@@ -35,6 +36,17 @@ export class AuthService {
     jwksUri: 'https://appleid.apple.com/auth/keys',
     cache: true,
   });
+
+  private getGoogleAudiences(): string[] {
+    const legacyClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') ?? '';
+    const multiClientIdsRaw = this.configService.get<string>('GOOGLE_CLIENT_IDS') ?? '';
+
+    const values = [legacyClientId, ...multiClientIdsRaw.split(',')]
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(values));
+  }
 
   constructor(
     private readonly usersService: UsersService,
@@ -239,28 +251,69 @@ export class AuthService {
    * Contrat Flutter : { user: { id, name, email }, accessToken }
    */
   async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthResponse> {
-    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    if (!clientId) {
-      throw new UnauthorizedException('GOOGLE_CLIENT_ID not configured');
+    if (!dto.idToken && !dto.accessToken) {
+      throw new BadRequestException('idToken or accessToken is required');
     }
-    const client = new OAuth2Client(clientId);
-    let ticket;
-    try {
-      ticket = await client.verifyIdToken({
-        idToken: dto.idToken,
-        audience: clientId,
-      });
-    } catch {
-      throw new UnauthorizedException('Invalid Google idToken');
+
+    let googleId = '';
+    let email = '';
+    let name = 'User';
+    let picture: string | undefined;
+
+    if (dto.idToken) {
+      const audiences = this.getGoogleAudiences();
+      if (audiences.length === 0) {
+        throw new UnauthorizedException(
+          'Google auth is not configured (set GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS)',
+        );
+      }
+
+      const client = new OAuth2Client();
+      let ticket;
+      try {
+        ticket = await client.verifyIdToken({
+          idToken: dto.idToken,
+          audience: audiences,
+        });
+      } catch {
+        throw new UnauthorizedException('Invalid Google idToken');
+      }
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        throw new UnauthorizedException('Google token missing email');
+      }
+
+      googleId = payload.sub;
+      email = payload.email.toLowerCase();
+      name = payload.name ?? payload.email.split('@')[0] ?? 'User';
+      picture = payload.picture ?? undefined;
+    } else if (dto.accessToken) {
+      try {
+        const { data } = await axios.get<{
+          sub?: string;
+          email?: string;
+          name?: string;
+          picture?: string;
+        }>('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: {
+            Authorization: `Bearer ${dto.accessToken}`,
+          },
+          timeout: 7000,
+        });
+
+        if (!data?.sub || !data?.email) {
+          throw new UnauthorizedException('Google token missing profile/email');
+        }
+
+        googleId = data.sub;
+        email = data.email.toLowerCase();
+        name = data.name ?? data.email.split('@')[0] ?? 'User';
+        picture = data.picture ?? undefined;
+      } catch {
+        throw new UnauthorizedException('Invalid Google accessToken');
+      }
     }
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
-      throw new UnauthorizedException('Google token missing email');
-    }
-    const googleId = payload.sub;
-    const email = payload.email.toLowerCase();
-    const name = payload.name ?? payload.email.split('@')[0] ?? 'User';
-    const picture = payload.picture ?? undefined;
 
     let user = await this.usersService.findByGoogleId(googleId);
     if (!user) {
