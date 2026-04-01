@@ -166,13 +166,37 @@ export class RewardsService {
       throw new BadRequestException('monthly_winner_not_found');
     }
 
-    const coupon = await this.rewardCouponModel
+    let coupon = await this.rewardCouponModel
       .findOne({ code: winner.couponCode })
       .lean()
       .exec();
 
+    // Recovery: If monthly winner exists but coupon doesn't, recreate it
     if (!coupon) {
-      throw new BadRequestException('monthly_coupon_not_found');
+      this.logger.warn(
+        `Coupon missing for winner ${winner.month}, recreating: ${winner.couponCode}`,
+      );
+      const discountPercent = Number(this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ?? 30);
+      const expiresAt = this.endOfMonth(new Date(winner.month + '-01'));
+
+      await this.rewardCouponModel.create({
+        code: winner.couponCode,
+        userId: winner.userId,
+        discountPercent,
+        reason: 'monthly_champion',
+        month: winner.month,
+        used: false,
+        expiresAt,
+      });
+
+      coupon = await this.rewardCouponModel
+        .findOne({ code: winner.couponCode })
+        .lean()
+        .exec();
+
+      if (!coupon) {
+        throw new BadRequestException('monthly_coupon_not_found');
+      }
     }
 
     const winnerUser = await this.userModel.findById(winner.userId).lean().exec();
