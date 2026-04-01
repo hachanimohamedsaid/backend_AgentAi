@@ -177,7 +177,11 @@ export class RewardsService {
         `Coupon missing for winner ${winner.month}, recreating: ${winner.couponCode}`,
       );
       const discountPercent = Number(this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ?? 30);
-      const expiresAt = this.endOfMonth(new Date(winner.month + '-01'));
+      
+      // Parse month string (YYYY-MM) to get proper date
+      const [year, month] = winner.month.split('-').map(Number);
+      const monthDate = new Date(Date.UTC(year, month - 1, 1));
+      const expiresAt = this.endOfMonth(monthDate);
 
       await this.rewardCouponModel.create({
         code: winner.couponCode,
