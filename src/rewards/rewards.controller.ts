@@ -59,4 +59,16 @@ export class RewardsController {
 
     return this.rewardsService.resendMonthlyCouponEmail(dto.email, dto.month);
   }
+
+  @Post(['rewards/test-coupon', 'api/rewards/test-coupon'])
+  @HttpCode(HttpStatus.CREATED)
+  async generateTestCoupon(
+    @Headers('x-internal-key') internalKey: string | undefined,
+  ) {
+    const expected = this.configService.get<string>('REWARDS_RUN_SECRET');
+    if (!expected || internalKey !== expected) {
+      throw new ForbiddenException('forbidden');
+    }
+    return this.rewardsService.generateTestCoupon();
+  }
 }

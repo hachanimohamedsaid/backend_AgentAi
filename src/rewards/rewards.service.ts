@@ -110,7 +110,8 @@ export class RewardsService {
     if (!coupon || coupon.used) {
       throw new BadRequestException('invalid_coupon');
     }
-    if (coupon.userId !== userId) {
+    // Allow test coupons (userId='TEST-USER') for any user
+    if (coupon.userId !== 'TEST-USER' && coupon.userId !== userId) {
       throw new ForbiddenException('coupon_owner_mismatch');
     }
     if (new Date() > new Date(coupon.expiresAt)) {
@@ -181,7 +182,12 @@ export class RewardsService {
       // Parse month string (YYYY-MM) to get proper date
       const [year, month] = winner.month.split('-').map(Number);
       const monthDate = new Date(Date.UTC(year, month - 1, 1));
-      const expiresAt = this.endOfMonth(monthDate);
+      
+      // If the original expiration has already passed, extend it by 30 days from today
+      let expiresAt = this.endOfMonth(monthDate);
+      if (new Date() > expiresAt) {
+        expiresAt = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
 
       await this.rewardCouponModel.create({
         code: winner.couponCode,
@@ -316,6 +322,30 @@ export class RewardsService {
     const y = date.getUTCFullYear();
     const m = `${date.getUTCMonth() + 1}`.padStart(2, '0');
     return `${y}-${m}`;
+  }
+
+  async generateTestCoupon() {
+    const testCouponCode = `TEST-${Date.now().toString(36).toUpperCase()}`;
+    const expiresAt = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    
+    await this.rewardCouponModel.create({
+      code: testCouponCode,
+      userId: 'TEST-USER', // Special marker for test coupons
+      discountPercent: 50, // 50% discount for testing
+      reason: 'test',
+      month: this.toMonthKey(new Date()),
+      used: false,
+      expiresAt,
+    });
+
+    return {
+      status: 'created',
+      couponCode: testCouponCode,
+      discountPercent: 50,
+      expiresAt,
+      validFor: '7 days',
+      note: 'This test coupon works for any user account',
+    };
   }
 
   private startOfMonth(date: Date): Date {
