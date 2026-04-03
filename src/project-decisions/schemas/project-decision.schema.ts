@@ -31,3 +31,12 @@ export class ProjectDecision {
 }
 
 export const ProjectDecisionSchema = SchemaFactory.createForClass(ProjectDecision);
+
+ProjectDecisionSchema.set('toJSON', {
+  transform: (_doc: unknown, ret: any) => {
+    ret.id = ret._id?.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});

@@ -25,6 +25,7 @@ import { GoogleConnectModule } from './google-connect/google-connect.module';
 import { RequestIdMiddleware } from './observability/request-id.middleware';
 import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
+import { ProjectDispatchModule } from './project-dispatch/project-dispatch.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { LoggerService } from './observability/logger.service';
     ChallengesModule,
     RewardsModule,
     GoogleConnectModule,
+    ProjectDispatchModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggerService],

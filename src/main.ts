@@ -28,6 +28,13 @@ async function bootstrap() {
     credentials: true,
   });
 
+  const apiPrefix = (process.env.API_PATH_PREFIX ?? '')
+    .trim()
+    .replace(/^\/+|\/+$/g, '');
+  if (apiPrefix) {
+    app.setGlobalPrefix(apiPrefix);
+  }
+
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.get('/metrics', async (_req: Request, res: Response) => {
     try {
@@ -50,7 +57,8 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`[App] NestJS server listening on port ${port}`);
+  const basePath = apiPrefix ? `/${apiPrefix}` : '';
+  console.log(`[App] NestJS server listening on port ${port} — préfixe HTTP: "${basePath || '/'}" (API_PATH_PREFIX=${apiPrefix || '(vide)'})`);
   console.log(`[App] Metrics endpoint available at http://localhost:${port}/metrics`);
   console.log(`[App] Health endpoint available at http://localhost:${port}/health`);
 }

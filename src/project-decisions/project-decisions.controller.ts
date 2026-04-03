@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ProjectDecisionsService } from './project-decisions.service';
 import { CreateProjectDecisionDto } from './dto/create-project-decision.dto';
 
 @Controller('project-decisions')
+@UseGuards(JwtAuthGuard)
 export class ProjectDecisionsController {
   constructor(
     private readonly projectDecisionsService: ProjectDecisionsService,
