@@ -143,6 +143,44 @@ Si `ML_SERVICE_URL` est défini (ou en local si le service ML tourne sur le port
 | `npm run test`           | Tests unitaires Nest                              |
 | `npm run test:e2e`       | Tests e2e (nécessite MONGO_URI dans .env)         |
 
+## Observability locale (Prometheus, Loki, Grafana, Alertmanager)
+
+### Démarrer la stack
+
+1. Démarrer le backend NestJS sur le port 3000:
+
+```bash
+npm run start:dev
+```
+
+2. Démarrer la stack observability:
+
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+### Endpoints utiles
+
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3001 (admin/admin)
+- Loki: http://localhost:3100/ready
+- Alertmanager: http://localhost:9093
+- Backend metrics: http://localhost:3000/metrics
+
+### Vérifications rapides
+
+```bash
+curl -s http://localhost:3000/health | jq .
+curl -s http://localhost:3000/metrics | head -30
+curl -s http://localhost:9090/api/v1/targets | jq .
+```
+
+### Arrêter la stack
+
+```bash
+docker compose -f docker-compose.observability.yml down
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

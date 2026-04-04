@@ -1,0 +1,38 @@
+groups:
+  - name: nestjs-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="nestjs-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: NestJS backend is down
+          description: Prometheus cannot scrape the NestJS /metrics endpoint.
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="nestjs-backend",status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="nestjs-backend"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High HTTP 5xx rate
+          description: HTTP 5xx rate is above 5% over the last 5 minutes.
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="nestjs-backend"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High API latency
+          description: P95 latency is above 1s over the last 5 minutes.
