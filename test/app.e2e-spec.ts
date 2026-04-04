@@ -33,26 +33,34 @@ describe('App (e2e)', () => {
 
   describe('Users API', () => {
     it('POST /users – create user', async () => {
+      const email = `jane+${Date.now()}@example.com`;
+
       const res = await request(app.getHttpServer())
         .post('/users')
-        .send({ name: 'Jane', email: 'jane@example.com' })
+        .send({ name: 'Jane', email })
         .expect(201);
       expect(res.body).toMatchObject({
         name: 'Jane',
-        email: 'jane@example.com',
+        email,
       });
-      expect(res.body).toHaveProperty('_id');
+      expect(res.body).toHaveProperty('id');
       expect(res.body).toHaveProperty('createdAt');
     });
 
     it('GET /users – list users', async () => {
+      const email = `jane-list+${Date.now()}@example.com`;
+      await request(app.getHttpServer())
+        .post('/users')
+        .send({ name: 'Jane', email })
+        .expect(201);
+
       const res = await request(app.getHttpServer())
         .get('/users')
         .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
-      const jane = res.body.find((u: { email: string }) => u.email === 'jane@example.com');
+      const jane = res.body.find((u: { email: string }) => u.email === email);
       expect(jane).toBeDefined();
-      expect(jane).toMatchObject({ name: 'Jane', email: 'jane@example.com' });
+      expect(jane).toMatchObject({ name: 'Jane', email });
     });
   });
 });

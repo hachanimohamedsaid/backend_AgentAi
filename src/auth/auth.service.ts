@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   ServiceUnavailableException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -32,6 +33,8 @@ export interface AuthResponse {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   private readonly appleJwks = jwksRsa({
     jwksUri: 'https://appleid.apple.com/auth/keys',
     cache: true,
@@ -42,6 +45,18 @@ export class AuthService {
     const multiClientIdsRaw = this.configService.get<string>('GOOGLE_CLIENT_IDS') ?? '';
 
     const values = [legacyClientId, ...multiClientIdsRaw.split(',')]
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(values));
+  }
+
+  private getAppleAudiences(): string[] {
+    const legacyAudience = this.configService.get<string>('APPLE_CLIENT_ID') ?? '';
+    const iosAudience = this.configService.get<string>('APPLE_AUDIENCE_IOS') ?? '';
+    const multiAudiencesRaw = this.configService.get<string>('APPLE_AUDIENCES') ?? '';
+
+    const values = [legacyAudience, iosAudience, ...multiAudiencesRaw.split(',')]
       .map((value) => value.trim())
       .filter(Boolean);
 
@@ -350,12 +365,30 @@ export class AuthService {
   };
 
   async loginWithApple(dto: AppleAuthDto): Promise<AuthResponse> {
+    const audiences = this.getAppleAudiences();
+    if (audiences.length === 0) {
+      throw new UnauthorizedException(
+        'Apple auth backend not configured (set APPLE_AUDIENCE_IOS or APPLE_AUDIENCES)',
+      );
+    }
+
+    this.logger.log(`Apple auth audiences loaded: ${audiences.length}`);
+    const audienceOption: string | [string, ...string[]] =
+      audiences.length === 1
+        ? audiences[0]
+        : (audiences as [string, ...string[]]);
+
     try {
       const decoded = jwt.verify(dto.identityToken, this.getAppleSigningKey, {
         algorithms: ['RS256'],
         issuer: 'https://appleid.apple.com',
-        audience: this.configService.get<string>('APPLE_CLIENT_ID') ?? undefined,
-      }) as unknown as { sub: string; email?: string };
+        audience: audienceOption,
+      }) as unknown as { sub?: string; email?: string; aud?: string | string[] };
+
+      if (!decoded.sub) {
+        throw new UnauthorizedException('Apple token missing sub');
+      }
+
       const appleId = decoded.sub;
       let email = decoded.email?.toLowerCase();
       let name = 'User';
@@ -396,11 +429,18 @@ export class AuthService {
         sub: (user as any)._id.toString(),
         email: user.email,
       });
+
+      const audLog = Array.isArray(decoded.aud)
+        ? decoded.aud.join(',')
+        : (decoded.aud ?? 'n/a');
+      this.logger.log(`Apple auth verify success: aud=${audLog} sub=${appleId}`);
+
       return {
         user: this.toUserPayload(user),
         accessToken,
       };
     } catch (e) {
+      this.logger.warn('Apple auth verify failed');
       if (e instanceof UnauthorizedException) throw e;
       throw new UnauthorizedException('Invalid Apple token');
     }

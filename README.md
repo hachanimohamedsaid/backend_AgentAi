@@ -68,6 +68,11 @@ $ npm run test:cov
 
 **Méthode de test complète :** voir [docs/TEST_COMPLET.md](docs/TEST_COMPLET.md) pour la procédure détaillée (local + prod + checklist).
 
+### Guides Auth (Railway)
+
+- Google Sign-In backend: [docs/NESTJS_GOOGLE_AUTH_RAILWAY_SETUP.md](docs/NESTJS_GOOGLE_AUTH_RAILWAY_SETUP.md)
+- Apple Sign-In backend: [docs/NESTJS_APPLE_SIGNIN_RAILWAY_SETUP.md](docs/NESTJS_APPLE_SIGNIN_RAILWAY_SETUP.md)
+
 ### 1. Variables d'environnement
 
 ```bash

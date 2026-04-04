@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -22,6 +22,9 @@ import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { GoogleConnectModule } from './google-connect/google-connect.module';
+import { RequestIdMiddleware } from './observability/request-id.middleware';
+import { PrometheusMiddleware } from './observability/prometheus.middleware';
+import { LoggerService } from './observability/logger.service';
 
 @Module({
   imports: [
@@ -79,6 +82,10 @@ import { GoogleConnectModule } from './google-connect/google-connect.module';
     GoogleConnectModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, LoggerService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware, PrometheusMiddleware).forRoutes('*');
+  }
+}
