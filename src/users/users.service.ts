@@ -1,6 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { User, UserDocument } from './schemas/user.schema';
@@ -9,6 +15,7 @@ import { User, UserDocument } from './schemas/user.schema';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly configService: ConfigService,
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
@@ -149,5 +156,101 @@ export class UsersService {
       .findById(userId)
       .select('challengePoints completedChallenges isPremium')
       .exec();
+  }
+
+  // ── Google OAuth Connect ──────────────────────────────────────────────────
+
+  async saveGoogleTokens(
+    userId: string,
+    data: {
+      accessToken: string;
+      refreshToken: string;
+      expiryDate: Date;
+      googleEmail: string;
+    },
+  ): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          googleAccessToken: data.accessToken,
+          googleRefreshToken: data.refreshToken,
+          googleTokenExpiry: data.expiryDate,
+          googleConnectedEmail: data.googleEmail,
+          googleScopeGranted: true,
+        },
+      )
+      .exec();
+  }
+
+  async saveGoogleSheetId(userId: string, sheetId: string): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { googleSheetId: sheetId })
+      .exec();
+  }
+
+  async getValidGoogleAccessToken(userId: string): Promise<{
+    accessToken: string;
+    googleEmail: string;
+    googleSheetId: string | null;
+  }> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user || !(user as any).googleRefreshToken) {
+      throw new NotFoundException('Google account not connected');
+    }
+
+    const expiry: Date | null = (user as any).googleTokenExpiry;
+    const isExpired = !expiry || expiry.getTime() < Date.now() + 60_000;
+
+    if (!isExpired) {
+      return {
+        accessToken: (user as any).googleAccessToken as string,
+        googleEmail: (user as any).googleConnectedEmail as string,
+        googleSheetId: (user as any).googleSheetId ?? null,
+      };
+    }
+
+    // Token expired — refresh via Google OAuth2
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
+
+    let refreshed: { access_token: string; expires_in: number };
+    try {
+      const response = await axios.post<{
+        access_token: string;
+        expires_in: number;
+      }>(
+        'https://oauth2.googleapis.com/token',
+        new URLSearchParams({
+          client_id: clientId ?? '',
+          client_secret: clientSecret ?? '',
+          refresh_token: (user as any).googleRefreshToken as string,
+          grant_type: 'refresh_token',
+        }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+      );
+      refreshed = response.data;
+    } catch {
+      throw new UnauthorizedException(
+        'Google token refresh failed — user must reconnect',
+      );
+    }
+
+    const newExpiry = new Date(Date.now() + refreshed.expires_in * 1000);
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          googleAccessToken: refreshed.access_token,
+          googleTokenExpiry: newExpiry,
+        },
+      )
+      .exec();
+
+    return {
+      accessToken: refreshed.access_token,
+      googleEmail: (user as any).googleConnectedEmail as string,
+      googleSheetId: (user as any).googleSheetId ?? null,
+    };
   }
 }

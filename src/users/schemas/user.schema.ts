@@ -80,6 +80,25 @@ export class User {
   @Prop({ type: [String], default: [] })
   championMonths: string[];
 
+  // Google OAuth Connect (Gmail + Sheets access — separate from Sign-In)
+  @Prop({ type: String, default: null })
+  googleAccessToken: string | null;
+
+  @Prop({ type: String, default: null })
+  googleRefreshToken: string | null;
+
+  @Prop({ type: Date, default: null })
+  googleTokenExpiry: Date | null;
+
+  @Prop({ type: String, default: null })
+  googleSheetId: string | null;
+
+  @Prop({ type: String, default: null })
+  googleConnectedEmail: string | null;
+
+  @Prop({ type: Boolean, default: false })
+  googleScopeGranted: boolean;
+
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -96,6 +115,8 @@ UserSchema.set('toJSON', {
     delete ret.resetPasswordExpires;
     delete ret.emailVerificationToken;
     delete ret.emailVerificationExpires;
+    delete ret.googleAccessToken;
+    delete ret.googleRefreshToken;
     delete ret.__v;
     ret.id = ret._id?.toString();
     delete ret._id;

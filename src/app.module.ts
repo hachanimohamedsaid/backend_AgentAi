@@ -21,6 +21,7 @@ import { MobilityModule } from './mobility/mobility.module';
 import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { GoogleConnectModule } from './google-connect/google-connect.module';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { RewardsModule } from './rewards/rewards.module';
     SocialCampaignModule,
     ChallengesModule,
     RewardsModule,
+    GoogleConnectModule,
   ],
   controllers: [AppController],
   providers: [AppService],
