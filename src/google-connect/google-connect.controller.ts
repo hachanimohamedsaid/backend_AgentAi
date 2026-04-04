@@ -52,10 +52,10 @@ export class GoogleConnectController {
     }
 
     try {
-      const { googleEmail } = await this.googleConnectService.handleCallback(code, state);
-      res.status(200).send(this.buildHtmlPage('success', googleEmail));
-    } catch (err: any) {
-      res.status(500).send(this.buildHtmlPage('error', err?.message ?? 'Internal error'));
+      await this.googleConnectService.handleCallback(code, state);
+      res.redirect('piagent://google-connect/success');
+    } catch {
+      res.redirect('piagent://google-connect/error');
     }
   }
 
