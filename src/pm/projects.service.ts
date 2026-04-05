@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,24 +17,49 @@ export class ProjectsService {
     private readonly projectDecisionsService: ProjectDecisionsService,
   ) {}
 
+  /**
+   * Résout un projectId en document MongoDB.
+   * Accepte :
+   *   - ObjectId MongoDB valide (24 hex)  → findById
+   *   - Chaîne numérique ("2")           → findOne({ row_number: 2 })
+   *   - Manque de doc                    → NotFoundException 404 JSON clair
+   *
+   * Pour les routes GET (sprints, détail…) : ne crée pas le projet si absent.
+   * Le dispatch service gère l'auto-création depuis la décision acceptée.
+   */
+  async resolveProjectDoc(id: string): Promise<ProjectDocument> {
+    let doc: ProjectDocument | null = null;
+
+    if (isValidObjectId(id) && /^[a-fA-F0-9]{24}$/.test(id)) {
+      doc = await this.projectModel.findById(id).exec();
+    } else {
+      const rowNumber = parseInt(id, 10);
+      if (!isNaN(rowNumber) && rowNumber >= 1) {
+        doc = await this.projectModel.findOne({ row_number: rowNumber }).exec();
+      }
+    }
+
+    if (!doc) {
+      throw new NotFoundException(
+        `Projet introuvable (id="${id}"). Fournissez un ObjectId MongoDB valide ou un row_number numérique existant.`,
+      );
+    }
+
+    return doc;
+  }
+
   async findAll(): Promise<ProjectDto[]> {
-    const docs = await this.projectModel
-      .find()
-      .sort({ updatedAt: -1 })
-      .exec();
+    const docs = await this.projectModel.find().sort({ updatedAt: -1 }).exec();
     return docs.map((d) => this.toDto(d));
   }
 
   /** Projets « acceptés » : dernière décision par ligne = accept, ou status accepted/accept. */
   async findAllAccepted(): Promise<ProjectDto[]> {
-    const acceptedRows =
-      await this.projectDecisionsService.getAcceptedRowNumbers();
+    const acceptedRows = await this.projectDecisionsService.getAcceptedRowNumbers();
 
     const byRow =
       acceptedRows.length > 0
-        ? await this.projectModel
-            .find({ row_number: { $in: acceptedRows } })
-            .exec()
+        ? await this.projectModel.find({ row_number: { $in: acceptedRows } }).exec()
         : [];
 
     const byStatus = await this.projectModel
@@ -61,22 +85,16 @@ export class ProjectsService {
       .map((d) => this.toDto(d));
   }
 
+  /** GET /projects/:id — accepte ObjectId ou row_number. */
   async findOne(id: string): Promise<ProjectDto> {
-    if (!isValidObjectId(id)) {
-      throw new BadRequestException(`Identifiant projet invalide: ${id}`);
-    }
-    const doc = await this.projectModel.findById(id).exec();
-    if (!doc) {
-      throw new NotFoundException(`Projet introuvable (id=${id}).`);
-    }
+    const doc = await this.resolveProjectDoc(id);
     return this.toDto(doc);
   }
 
   private toDto(doc: ProjectDocument): ProjectDto {
     const o = doc.toJSON() as Record<string, unknown>;
     const rn = o.row_number as number | null | undefined;
-    const row =
-      rn === null || rn === undefined ? null : Number(rn);
+    const row = rn === null || rn === undefined ? null : Number(rn);
 
     return {
       ...o,
