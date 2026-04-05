@@ -299,7 +299,7 @@ export class DispatchSprintEmailsService {
           htmlBody = await this.dispatchLlm.generateEmailHtml(payloadJson);
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'LLM indisponible';
-          console.warn('[DispatchSprintEmails] LLM indisponible, template fixe:', msg);
+          this.logger.warn(`[DispatchSprintEmails] LLM indisponible, template fixe utilisé: ${msg}`);
           htmlBody = this.renderFixedTemplate(payloadJson);
         }
       } else {
