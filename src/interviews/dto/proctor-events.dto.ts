@@ -4,7 +4,6 @@ import {
   IsInt,
   IsISO8601,
   IsOptional,
-  IsString,
   IsUUID,
   Min,
   ValidateNested,
@@ -53,12 +52,4 @@ export class ProctorEventsDto {
   @ValidateNested({ each: true })
   @Type(() => ProctoringEventDto)
   events: ProctoringEventDto[];
-
-  /**
-   * Token invité passé dans le body (fallback si absent du header Authorization).
-   * En prod, préférer Authorization: Bearer <guest_token>.
-   */
-  @IsOptional()
-  @IsString()
-  token?: string;
 }
