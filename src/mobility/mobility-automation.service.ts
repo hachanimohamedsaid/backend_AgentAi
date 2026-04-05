@@ -66,7 +66,9 @@ export class MobilityAutomationService {
 
     const ranked = this.pricingEngine.rank(quotes, rule.preferences ?? {});
     if (!ranked.best) {
-      this.logger.warn(`No quote options for rule ${String((rule as any)._id)}`);
+      this.logger.warn(
+        `No quote options for rule ${String((rule as any)._id)}`,
+      );
       return;
     }
 
@@ -85,7 +87,9 @@ export class MobilityAutomationService {
     );
     const expiresAt = new Date(Date.now() + Math.max(1, ttlMinutes) * 60_000);
 
-    const status = rule.requireUserApproval ? 'PENDING_USER_APPROVAL' : 'PENDING_PROVIDER';
+    const status = rule.requireUserApproval
+      ? 'PENDING_USER_APPROVAL'
+      : 'PENDING_PROVIDER';
 
     await this.proposalModel.create({
       userId: rule.userId,
@@ -114,7 +118,10 @@ export class MobilityAutomationService {
       return false;
     }
 
-    const tz = rule.timezone || this.configService.get<string>('MOBILITY_DEFAULT_TIMEZONE') || 'UTC';
+    const tz =
+      rule.timezone ||
+      this.configService.get<string>('MOBILITY_DEFAULT_TIMEZONE') ||
+      'UTC';
     const localParts = this.getLocalParts(now, tz);
 
     if (localParts.hour !== cron.hour || localParts.minute !== cron.minute) {
@@ -135,7 +142,9 @@ export class MobilityAutomationService {
     );
   }
 
-  private parseDailyCron(cron: string): { minute: number; hour: number } | null {
+  private parseDailyCron(
+    cron: string,
+  ): { minute: number; hour: number } | null {
     const parts = cron.trim().split(/\s+/);
     if (parts.length !== 5) {
       return null;
@@ -194,7 +203,8 @@ export class MobilityAutomationService {
   async expireStalePendingProvider() {
     try {
       const watchdogMinutesRaw = Number(
-        this.configService.get<string>('MOBILITY_PROVIDER_WATCHDOG_MINUTES') ?? '3',
+        this.configService.get<string>('MOBILITY_PROVIDER_WATCHDOG_MINUTES') ??
+          '3',
       );
       const watchdogMinutes = Number.isFinite(watchdogMinutesRaw)
         ? Math.min(5, Math.max(2, Math.floor(watchdogMinutesRaw)))
@@ -249,7 +259,10 @@ export class MobilityAutomationService {
         );
       }
     } catch (error) {
-      this.logger.error('Failed to expire stale pending provider bookings', error instanceof Error ? error.stack : undefined);
+      this.logger.error(
+        'Failed to expire stale pending provider bookings',
+        error instanceof Error ? error.stack : undefined,
+      );
     }
   }
 }

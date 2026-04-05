@@ -63,7 +63,8 @@ export class PrometheusMiddleware implements NestMiddleware {
     const start = process.hrtime.bigint();
 
     res.on('finish', () => {
-      const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
+      const durationSeconds =
+        Number(process.hrtime.bigint() - start) / 1_000_000_000;
       const statusCode = String(res.statusCode);
       const routePath = req.route?.path ?? req.path;
       const method = req.method;

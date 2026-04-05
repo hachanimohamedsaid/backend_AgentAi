@@ -52,10 +52,7 @@ export class UsersController {
   // ✨ NEW: Complete a challenge (add points)
   @Post('complete-challenge')
   @UseGuards(JwtAuthGuard)
-  async completeChallenge(
-    @Request() req,
-    @Body() body: CompleteChallengeDto,
-  ) {
+  async completeChallenge(@Request() req, @Body() body: CompleteChallengeDto) {
     const updated = await this.usersService.completeChallenge(
       req.user.id,
       body.challengeId,

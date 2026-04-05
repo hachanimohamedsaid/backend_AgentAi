@@ -3,7 +3,11 @@ import { Document } from 'mongoose';
 
 export type MobilityBookingDocument = MobilityBooking & Document;
 
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
+@Schema({
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+})
 export class MobilityBooking {
   @Prop({ required: true, index: true })
   userId: string;
@@ -16,7 +20,15 @@ export class MobilityBooking {
 
   @Prop({
     required: true,
-    enum: ['PENDING_PROVIDER', 'ACCEPTED', 'REJECTED', 'FAILED', 'CANCELED', 'EXPIRED', 'COMPLETED'],
+    enum: [
+      'PENDING_PROVIDER',
+      'ACCEPTED',
+      'REJECTED',
+      'FAILED',
+      'CANCELED',
+      'EXPIRED',
+      'COMPLETED',
+    ],
     default: 'PENDING_PROVIDER',
   })
   status:
@@ -92,7 +104,8 @@ export class MobilityBooking {
   updatedAt?: Date;
 }
 
-export const MobilityBookingSchema = SchemaFactory.createForClass(MobilityBooking);
+export const MobilityBookingSchema =
+  SchemaFactory.createForClass(MobilityBooking);
 MobilityBookingSchema.index({ proposalId: 1 }, { unique: true });
 
 MobilityBookingSchema.set('toJSON', {

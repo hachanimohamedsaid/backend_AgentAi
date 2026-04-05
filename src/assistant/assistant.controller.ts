@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { AssistantService } from './assistant.service';
 import { CreateContextDto } from './dto/create-context.dto';
@@ -28,10 +36,7 @@ export class AssistantController {
    */
   @Post('context')
   @UseGuards(OptionalJwtAuthGuard)
-  async handleContext(
-    @Body() dto: CreateContextDto,
-    @Req() req: Request,
-  ) {
+  async handleContext(@Body() dto: CreateContextDto, @Req() req: Request) {
     const authUser = (req as any).user as
       | { sub?: string; id?: string; userId?: string }
       | undefined;
@@ -53,7 +58,7 @@ export class AssistantController {
       await this.assistantService.generateAndStoreAvaSuggestions(effectiveDto);
 
     return avaSuggestionDocs.slice(0, 3).map((s) => {
-      const obj = s.toJSON ? (s.toJSON() as any) : (s as any);
+      const obj = s.toJSON ? s.toJSON() : (s as any);
       return {
         id: obj.id ?? obj._id?.toString(),
         type: s.type,
@@ -100,7 +105,10 @@ export class AssistantController {
    */
   @Post('notifications')
   @UseGuards(OptionalJwtAuthGuard)
-  async notifications(@Body() dto: GenerateNotificationsDto, @Req() req: Request) {
+  async notifications(
+    @Body() dto: GenerateNotificationsDto,
+    @Req() req: Request,
+  ) {
     const authUser = (req as any).user as
       | { sub?: string; id?: string; userId?: string }
       | undefined;
@@ -115,4 +123,3 @@ export class AssistantController {
     return this.assistantService.generateNotifications(effectiveDto);
   }
 }
-

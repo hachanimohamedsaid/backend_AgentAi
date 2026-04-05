@@ -5,20 +5,14 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  Context,
-  ContextDocument,
-} from './schemas/context.schema';
+import { Context, ContextDocument } from './schemas/context.schema';
 import {
   Suggestion,
   SuggestionDocument,
   SuggestionStatus,
   SuggestionType,
 } from './schemas/suggestion.schema';
-import {
-  Habit,
-  HabitDocument,
-} from './schemas/habit.schema';
+import { Habit, HabitDocument } from './schemas/habit.schema';
 import {
   InteractionLog,
   InteractionLogDocument,
@@ -153,10 +147,8 @@ export class AssistantService {
     } else {
       const total = goals.length;
       const avgProgress =
-        goals.reduce(
-          (sum: number, g: any) => sum + (g.progress ?? 0),
-          0,
-        ) / total;
+        goals.reduce((sum: number, g: any) => sum + (g.progress ?? 0), 0) /
+        total;
       const categories = Array.from(
         new Set(
           goals
@@ -171,7 +163,7 @@ export class AssistantService {
       )}%). Main categories: ${topCategories}.`;
     }
 
-    const learnedPreferences = await this.buildLearnedPreferences(dto.userId!);
+    const learnedPreferences = await this.buildLearnedPreferences(dto.userId);
 
     const contextForModel = {
       profile,
@@ -288,7 +280,9 @@ export class AssistantService {
   private async buildBackendSignals(
     userId: string,
     currentTime?: string,
-  ): Promise<Array<{ signalType: string; payload?: Record<string, any>; source: string }>> {
+  ): Promise<
+    Array<{ signalType: string; payload?: Record<string, any>; source: string }>
+  > {
     const latestContext = await this.contextModel
       .findOne({ userId })
       .sort({ createdAt: -1 })
@@ -347,7 +341,10 @@ export class AssistantService {
       });
     }
 
-    const mlSignals = await this.buildMlSignalsForUser(userId, latestContext as any);
+    const mlSignals = await this.buildMlSignalsForUser(
+      userId,
+      latestContext as any,
+    );
     signals.push(...mlSignals);
 
     return signals;
@@ -366,7 +363,9 @@ export class AssistantService {
       focusHours: number;
       meetings?: Array<{ title: string; time: string }>;
     },
-  ): Promise<Array<{ signalType: string; payload?: Record<string, any>; source: string }>> {
+  ): Promise<
+    Array<{ signalType: string; payload?: Record<string, any>; source: string }>
+  > {
     const user = await this.userModel.findOne({ userId }).lean().exec();
     if (!user?.mlTrained) {
       return [];
@@ -379,8 +378,12 @@ export class AssistantService {
         location: latestContext.location,
         weather: latestContext.weather,
         focusHours:
-          typeof latestContext.focusHours === 'number' ? latestContext.focusHours : 0,
-        meetings: Array.isArray(latestContext.meetings) ? latestContext.meetings.length : 0,
+          typeof latestContext.focusHours === 'number'
+            ? latestContext.focusHours
+            : 0,
+        meetings: Array.isArray(latestContext.meetings)
+          ? latestContext.meetings.length
+          : 0,
       });
 
       if (!Array.isArray(suggestions) || suggestions.length === 0) {
@@ -395,7 +398,11 @@ export class AssistantService {
 
       const minConfidence = 0.5;
       for (const s of suggestions) {
-        if (!s || typeof s.message !== 'string' || (s.confidence ?? 0) < minConfidence) {
+        if (
+          !s ||
+          typeof s.message !== 'string' ||
+          (s.confidence ?? 0) < minConfidence
+        ) {
           continue;
         }
         out.push({
@@ -414,7 +421,9 @@ export class AssistantService {
     }
   }
 
-  private async buildLearnedPreferences(userId: string): Promise<string | null> {
+  private async buildLearnedPreferences(
+    userId: string,
+  ): Promise<string | null> {
     // 1) Prefer using aggregated ML profile if it exists
     const profile = await this.assistantUserProfileModel
       .findOne({ userId })
@@ -450,10 +459,7 @@ export class AssistantService {
       return null;
     }
 
-    const stats: Record<
-      string,
-      { accepted: number; dismissed: number }
-    > = {};
+    const stats: Record<string, { accepted: number; dismissed: number }> = {};
 
     for (const s of samples) {
       const key = s.suggestionType ?? 'unknown';
@@ -484,7 +490,6 @@ export class AssistantService {
 
     return parts.length ? parts.join(' ') : null;
   }
-
 
   /**
    * If user.mlTrained → call ML /predict. Otherwise use rule-based suggestions.
@@ -581,13 +586,9 @@ export class AssistantService {
     return this.habitModel.findOne({ userId, suggestionType: type }).exec();
   }
 
-  private adjustConfidence(
-    base: number,
-    habit: HabitDocument | null,
-  ): number {
+  private adjustConfidence(base: number, habit: HabitDocument | null): number {
     const successRate = habit?.successRate ?? 0.5;
-    const adjusted =
-      base + (successRate - 0.5) * 0.3; // shift +/-0.15 max
+    const adjusted = base + (successRate - 0.5) * 0.3; // shift +/-0.15 max
     return Math.min(1, Math.max(0, adjusted));
   }
 
@@ -830,10 +831,7 @@ export class AssistantService {
    * If user has >= ACCEPTED_THRESHOLD accepted samples and (mlTrained is false and lastTrainingAt allows),
    * call ML retrain and set user.mlTrained = true, user.lastTrainingAt = now.
    */
-  private async maybeTriggerRetrain(
-    userId: string,
-    now: Date,
-  ): Promise<void> {
+  private async maybeTriggerRetrain(userId: string, now: Date): Promise<void> {
     const acceptedCount = await this.trainingSampleModel
       .countDocuments({ userId, accepted: true })
       .exec();
@@ -956,4 +954,3 @@ export class AssistantService {
     await profile.save();
   }
 }
-

@@ -25,11 +25,15 @@ export class LoggerService {
         new winston.transports.Console({
           format: winston.format.combine(
             winston.format.colorize(),
-            winston.format.printf(({ level, message, requestId, timestamp, ...meta }) => {
-              const reqId = (requestId as string | undefined) || 'none';
-              const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
-              return `[${reqId}] [${level}] ${String(message)} ${metaStr}`;
-            }),
+            winston.format.printf(
+              ({ level, message, requestId, timestamp, ...meta }) => {
+                const reqId = (requestId as string | undefined) || 'none';
+                const metaStr = Object.keys(meta).length
+                  ? JSON.stringify(meta)
+                  : '';
+                return `[${reqId}] [${level}] ${String(message)} ${metaStr}`;
+              },
+            ),
           ),
         }),
       ],

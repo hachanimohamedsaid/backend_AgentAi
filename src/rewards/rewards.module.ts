@@ -3,8 +3,14 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RewardsService } from './rewards.service';
 import { RewardsController } from './rewards.controller';
-import { RewardCoupon, RewardCouponSchema } from './schemas/reward-coupon.schema';
-import { MonthlyWinner, MonthlyWinnerSchema } from './schemas/monthly-winner.schema';
+import {
+  RewardCoupon,
+  RewardCouponSchema,
+} from './schemas/reward-coupon.schema';
+import {
+  MonthlyWinner,
+  MonthlyWinnerSchema,
+} from './schemas/monthly-winner.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({

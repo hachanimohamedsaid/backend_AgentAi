@@ -29,4 +29,3 @@ export class AssistantUserProfile {
 
 export const AssistantUserProfileSchema =
   SchemaFactory.createForClass(AssistantUserProfile);
-

@@ -36,7 +36,11 @@ export class Campaign {
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   campaignResult: unknown;
 
-  @Prop({ required: true, enum: CampaignStatus, default: CampaignStatus.Generating })
+  @Prop({
+    required: true,
+    enum: CampaignStatus,
+    default: CampaignStatus.Generating,
+  })
   status: string;
 
   @Prop({ type: [String], default: [] })

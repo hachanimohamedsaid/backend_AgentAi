@@ -128,14 +128,14 @@ export class GoogleConnectService {
     }
 
     // Trigger N8N setup-sheet webhook (fire-and-forget — don't fail if N8N is slow)
-    const n8nBase =
-      this.configService.get<string>('N8N_BASE_URL') ?? '';
+    const n8nBase = this.configService.get<string>('N8N_BASE_URL') ?? '';
     if (n8nBase) {
       firstValueFrom(
-        this.httpService.post(
-          `${n8nBase}/webhook/google-connect-setup`,
-          { userId, accessToken: tokenData.access_token, googleEmail },
-        ),
+        this.httpService.post(`${n8nBase}/webhook/google-connect-setup`, {
+          userId,
+          accessToken: tokenData.access_token,
+          googleEmail,
+        }),
       ).catch((err: any) => {
         console.error(
           '[GoogleConnect] N8N setup-sheet webhook failed:',
@@ -159,14 +159,17 @@ export class GoogleConnectService {
     const connected = (user as any).googleScopeGranted === true;
     return {
       connected,
-      googleEmail: connected ? ((user as any).googleConnectedEmail ?? null) : null,
+      googleEmail: connected
+        ? ((user as any).googleConnectedEmail ?? null)
+        : null,
       sheetReady: connected && (user as any).googleSheetId != null,
     };
   }
 
   private getRedirectUri(): string {
     const base =
-      this.configService.get<string>('BACKEND_BASE_URL') ?? 'http://localhost:3000';
+      this.configService.get<string>('BACKEND_BASE_URL') ??
+      'http://localhost:3000';
     return `${base}/google-connect/callback`;
   }
 }

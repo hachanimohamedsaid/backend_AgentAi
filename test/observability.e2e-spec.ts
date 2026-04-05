@@ -72,16 +72,20 @@ describe('Observability (e2e)', () => {
     const res = await request(app.getHttpServer()).get('/ping').expect(200);
 
     expect(typeof res.headers['x-request-id']).toBe('string');
-    expect((res.headers['x-request-id'] as string).length).toBeGreaterThan(0);
+    expect(res.headers['x-request-id'].length).toBeGreaterThan(0);
   });
 
   it('exposes http metrics including /ping route', async () => {
     await request(app.getHttpServer()).get('/ping').expect(200);
 
-    const metrics = await request(app.getHttpServer()).get('/metrics').expect(200);
+    const metrics = await request(app.getHttpServer())
+      .get('/metrics')
+      .expect(200);
 
     expect(metrics.text).toContain('http_requests_total');
     expect(metrics.text).toContain('http_request_duration_seconds');
-    expect(metrics.text).toMatch(/http_requests_total\{[^}]*route="\/ping"[^}]*status_code="200"[^}]*\} [1-9]/);
+    expect(metrics.text).toMatch(
+      /http_requests_total\{[^}]*route="\/ping"[^}]*status_code="200"[^}]*\} [1-9]/,
+    );
   });
 });

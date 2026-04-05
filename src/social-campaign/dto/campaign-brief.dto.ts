@@ -31,7 +31,8 @@ export class CampaignBriefDto {
   targetAudience: string;
 
   @IsEnum(ToneOfVoiceDto, {
-    message: 'toneOfVoice must be one of: professional, friendly, bold, luxurious',
+    message:
+      'toneOfVoice must be one of: professional, friendly, bold, luxurious',
   })
   toneOfVoice: ToneOfVoiceDto;
 

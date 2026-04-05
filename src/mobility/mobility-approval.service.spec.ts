@@ -20,8 +20,14 @@ describe('MobilityApprovalService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new MobilityApprovalService(proposalModel, bookingService, configService);
-    jest.spyOn<any, any>(service as any, 'enqueueProviderDispatch').mockImplementation(() => undefined);
+    service = new MobilityApprovalService(
+      proposalModel,
+      bookingService,
+      configService,
+    );
+    jest
+      .spyOn<any, any>(service as any, 'enqueueProviderDispatch')
+      .mockImplementation(() => undefined);
   });
 
   it('dispatchProviderRequest fails when provider URL is missing in real-only mode', async () => {
@@ -35,14 +41,20 @@ describe('MobilityApprovalService', () => {
       pickupAt: new Date(),
     } as any;
 
-    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    proposalModel.findById.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
     configService.get.mockReturnValue(undefined);
 
     const handleSpy = jest
       .spyOn(service as any, 'handleProviderEvent')
       .mockResolvedValue({ ok: true, status: 'FAILED' });
 
-    await (service as any).dispatchProviderRequest('prop-fallback', 'book-fallback', 'user-1');
+    await (service as any).dispatchProviderRequest(
+      'prop-fallback',
+      'book-fallback',
+      'user-1',
+    );
 
     expect(handleSpy).toHaveBeenCalledWith(
       'prop-fallback',
@@ -59,7 +71,9 @@ describe('MobilityApprovalService', () => {
       status: 'PENDING_PROVIDER',
       bookingId: 'book-1',
     };
-    proposalModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    proposalModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
 
     const res = await service.confirm('user-1', 'prop-1');
 
@@ -83,7 +97,9 @@ describe('MobilityApprovalService', () => {
       save,
     } as any;
 
-    proposalModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    proposalModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
     bookingService.createPendingFromProposal.mockResolvedValue({
       _id: { toString: () => 'book-2' },
     });
@@ -98,7 +114,10 @@ describe('MobilityApprovalService', () => {
     });
     expect(proposal.status).toBe('PENDING_PROVIDER');
     expect(save).toHaveBeenCalled();
-    expect(bookingService.createPendingFromProposal).toHaveBeenCalledWith('user-1', proposal);
+    expect(bookingService.createPendingFromProposal).toHaveBeenCalledWith(
+      'user-1',
+      proposal,
+    );
   });
 
   it('confirm throws when proposal is expired', async () => {
@@ -111,9 +130,13 @@ describe('MobilityApprovalService', () => {
       expiresAt: new Date(Date.now() - 60_000),
       save,
     } as any;
-    proposalModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    proposalModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
 
-    await expect(service.confirm('user-1', 'prop-3')).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.confirm('user-1', 'prop-3')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(proposal.status).toBe('EXPIRED');
     expect(save).toHaveBeenCalled();
   });
@@ -129,8 +152,12 @@ describe('MobilityApprovalService', () => {
       save,
     } as any;
 
-    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
-    bookingService.updateStatusByProposalId.mockResolvedValue({ _id: { toString: () => 'book-4' } });
+    proposalModel.findById.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
+    bookingService.updateStatusByProposalId.mockResolvedValue({
+      _id: { toString: () => 'book-4' },
+    });
 
     const res = await service.handleProviderEvent('prop-4', 'DRIVER_ACCEPTED', {
       providerBookingRef: 'prov-123',
@@ -162,8 +189,12 @@ describe('MobilityApprovalService', () => {
       save,
     } as any;
 
-    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
-    bookingService.updateStatusByProposalId.mockResolvedValue({ _id: { toString: () => 'book-raw' } });
+    proposalModel.findById.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
+    bookingService.updateStatusByProposalId.mockResolvedValue({
+      _id: { toString: () => 'book-raw' },
+    });
 
     await service.handleProviderEvent('prop-raw', 'DRIVER_ACCEPTED', {
       providerBookingRef: 'prov-raw',
@@ -211,7 +242,9 @@ describe('MobilityApprovalService', () => {
       save,
     } as any;
 
-    proposalModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(proposal) });
+    proposalModel.findById.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(proposal),
+    });
 
     const res = await service.handleProviderEvent('prop-5', 'DISPATCH_FAILED', {
       errorCode: 'PROVIDER_HTTP_500',

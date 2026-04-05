@@ -59,7 +59,9 @@ export class MobilityPricingEngine {
     if (!preferences?.maxEtaMinutes) {
       return options;
     }
-    return options.filter((option) => option.etaMinutes <= preferences.maxEtaMinutes!);
+    return options.filter(
+      (option) => option.etaMinutes <= preferences.maxEtaMinutes!,
+    );
   }
 
   private reverseNormalize(value: number, min: number, max: number) {

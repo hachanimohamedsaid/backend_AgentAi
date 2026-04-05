@@ -39,6 +39,9 @@ export default tseslint.config(
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-unsafe-enum-comparison': 'off',
+      // Mongoose / mixed JSON fields are often typed loosely; template coalescing is intentional.
+      '@typescript-eslint/no-base-to-string': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
       'no-constant-binary-expression': 'off',
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },

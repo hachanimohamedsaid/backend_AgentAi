@@ -70,7 +70,11 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     points: 150,
     type: 'premium_checkout',
     color: '#F59E0B',
-    steps: ['Open billing page', 'Choose premium plan', 'Complete secure checkout'],
+    steps: [
+      'Open billing page',
+      'Choose premium plan',
+      'Complete secure checkout',
+    ],
     requiresVoice: false,
     requiresPayment: true,
     isActive: true,
@@ -80,7 +84,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_profile_complete',
     title: 'Profile Pro',
     description: 'Complete your profile details',
-    longDescription: 'Add role, location, phone, and bio to complete your profile setup.',
+    longDescription:
+      'Add role, location, phone, and bio to complete your profile setup.',
     icon: 'user',
     points: 60,
     type: 'profile_setup',
@@ -95,7 +100,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_goal_create_1',
     title: 'Goal Setter',
     description: 'Create your first goal',
-    longDescription: 'Define one realistic goal in the goals module and save it.',
+    longDescription:
+      'Define one realistic goal in the goals module and save it.',
     icon: 'target',
     points: 50,
     type: 'goal_create',
@@ -125,7 +131,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_meeting_create',
     title: 'Meeting Organizer',
     description: 'Create your first smart meeting',
-    longDescription: 'Use the meeting module to create and save a meeting context.',
+    longDescription:
+      'Use the meeting module to create and save a meeting context.',
     icon: 'calendar',
     points: 70,
     type: 'meeting_create',
@@ -140,7 +147,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_advisor_first_tip',
     title: 'Advisor Insight',
     description: 'Request your first advisor suggestion',
-    longDescription: 'Ask the advisor module for one actionable business suggestion.',
+    longDescription:
+      'Ask the advisor module for one actionable business suggestion.',
     icon: 'lightbulb',
     points: 55,
     type: 'advisor_tip',
@@ -155,7 +163,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_ai_prompt_1',
     title: 'AI Explorer',
     description: 'Send your first AI prompt',
-    longDescription: 'Use the AI module to generate content from one custom prompt.',
+    longDescription:
+      'Use the AI module to generate content from one custom prompt.',
     icon: 'cpu',
     points: 65,
     type: 'ai_prompt',
@@ -185,7 +194,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_ml_prediction_1',
     title: 'Prediction Starter',
     description: 'Run one ML prediction',
-    longDescription: 'Generate one prediction from the ML service and inspect output.',
+    longDescription:
+      'Generate one prediction from the ML service and inspect output.',
     icon: 'activity',
     points: 85,
     type: 'ml_prediction',
@@ -215,7 +225,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_realtime_session_1',
     title: 'Realtime Connector',
     description: 'Start one realtime session',
-    longDescription: 'Open a realtime session and exchange at least one message.',
+    longDescription:
+      'Open a realtime session and exchange at least one message.',
     icon: 'radio',
     points: 70,
     type: 'realtime_session',
@@ -245,7 +256,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_social_campaign_2',
     title: 'Campaign Builder',
     description: 'Create 2 social campaign drafts',
-    longDescription: 'Generate and save two campaign drafts for different channels.',
+    longDescription:
+      'Generate and save two campaign drafts for different channels.',
     icon: 'megaphone',
     points: 120,
     type: 'social_campaign',
@@ -305,7 +317,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_goal_streak_7',
     title: '7-Day Streak',
     description: 'Maintain 7 days of activity',
-    longDescription: 'Keep daily activity in the app for seven consecutive days.',
+    longDescription:
+      'Keep daily activity in the app for seven consecutive days.',
     icon: 'flame',
     points: 140,
     type: 'streak_7_days',
@@ -320,7 +333,8 @@ const DEFAULT_CHALLENGES: SeedChallenge[] = [
     id: 'ch_referral_invite_1',
     title: 'Community Invite',
     description: 'Invite one collaborator',
-    longDescription: 'Share the app with one collaborator and confirm invitation sent.',
+    longDescription:
+      'Share the app with one collaborator and confirm invitation sent.',
     icon: 'user-plus',
     points: 60,
     type: 'referral_invite',

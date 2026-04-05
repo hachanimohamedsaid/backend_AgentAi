@@ -1,6 +1,8 @@
 /** Map internal briefing / report JSON to shapes expected by the Flutter meeting_intelligence UI. */
 
-export function toFlutterCulture(brief: Record<string, unknown>): Record<string, unknown> {
+export function toFlutterCulture(
+  brief: Record<string, unknown>,
+): Record<string, unknown> {
   const dos = Array.isArray(brief.dos)
     ? (brief.dos as unknown[]).map((x) => String(x))
     : [];
@@ -22,9 +24,7 @@ export function toFlutterCulture(brief: Record<string, unknown>): Record<string,
       : first10.length
         ? `Suggested flow: ${first10[0]}.`
         : 'Adapt to local norms; lead with rapport.',
-    openingLine:
-      openingTopics[0] ??
-      (dos[0] ? `Consider: ${dos[0]}` : ''),
+    openingLine: openingTopics[0] ?? (dos[0] ? `Consider: ${dos[0]}` : ''),
     meetingFlow: first10.length ? first10 : openingTopics,
   };
 }
@@ -55,7 +55,11 @@ export function toFlutterPsychFromProfile(
   return {
     personalityType: tags[0] || 'Investor profile',
     dominantTraits:
-      tags.length > 1 ? tags : tags.length ? tags : ['Analytical', 'Data-driven'],
+      tags.length > 1
+        ? tags
+        : tags.length
+          ? tags
+          : ['Analytical', 'Data-driven'],
     communicationPreference: whatTheyCare.length
       ? whatTheyCare.join(' ')
       : String(profile.decisionStyle ?? ''),
@@ -71,7 +75,9 @@ export function toFlutterPsychFromProfile(
   };
 }
 
-export function toFlutterImage(ex: Record<string, unknown>): Record<string, unknown> {
+export function toFlutterImage(
+  ex: Record<string, unknown>,
+): Record<string, unknown> {
   const toItems = (arr: unknown, type: string) =>
     Array.isArray(arr)
       ? (arr as unknown[]).map((t) => ({
@@ -93,7 +99,9 @@ export function toFlutterImage(ex: Record<string, unknown>): Record<string, unkn
   };
 }
 
-export function toFlutterOffer(off: Record<string, unknown>): Record<string, unknown> {
+export function toFlutterOffer(
+  off: Record<string, unknown>,
+): Record<string, unknown> {
   const fairScore = Number(off.fairScore) || 70;
   const neg = (off.negotiateRange ?? {}) as Record<string, unknown>;
   const mr = (off.marketRange ?? {}) as Record<string, unknown>;
@@ -108,7 +116,8 @@ export function toFlutterOffer(off: Record<string, unknown>): Record<string, unk
     fairEquityRange = `${mr.equityMin}%–${mr.equityMax}%`;
   }
   const walkAwayParts: string[] = [];
-  if (walk.equityMax != null) walkAwayParts.push(`Max equity: ${walk.equityMax}%`);
+  if (walk.equityMax != null)
+    walkAwayParts.push(`Max equity: ${walk.equityMax}%`);
   if (walk.valuationMin != null)
     walkAwayParts.push(`Min valuation: ${walk.valuationMin}`);
   const walkAwayLimit =
@@ -130,7 +139,9 @@ export function toFlutterOffer(off: Record<string, unknown>): Record<string, unk
   };
 }
 
-export function toFlutterLocation(loc: Record<string, unknown>): Record<string, unknown> {
+export function toFlutterLocation(
+  loc: Record<string, unknown>,
+): Record<string, unknown> {
   const recs = Array.isArray(loc.recommendations)
     ? (loc.recommendations as Record<string, unknown>[])
     : [];
@@ -211,7 +222,10 @@ export function toFlutterReport(
     imageSummary: Array.isArray(executiveImage.dressCode)
       ? (executiveImage.dressCode as unknown[]).map((x) => String(x)).join('; ')
       : '',
-    locationSummary: locRecs.map((r) => r.name).filter(Boolean).join('; '),
+    locationSummary: locRecs
+      .map((r) => r.name)
+      .filter(Boolean)
+      .join('; '),
     motivationalMessage: String(fr.avaQuote ?? ''),
     overallVerdict: Array.isArray(fr.top3Risks)
       ? (fr.top3Risks as unknown[]).map((x) => String(x)).join(' ')

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -54,7 +58,8 @@ export class MobilityUberAuthService {
     if (!clientId || !clientSecret || !redirectUri) {
       throw new BadRequestException({
         code: 'UBER_CONFIG_MISSING',
-        message: 'UBER_CLIENT_ID, UBER_CLIENT_SECRET and UBER_REDIRECT_URI are required',
+        message:
+          'UBER_CLIENT_ID, UBER_CLIENT_SECRET and UBER_REDIRECT_URI are required',
       });
     }
 
@@ -82,11 +87,14 @@ export class MobilityUberAuthService {
     }
 
     const refreshToken =
-      typeof response.data?.refresh_token === 'string' ? response.data.refresh_token : null;
+      typeof response.data?.refresh_token === 'string'
+        ? response.data.refresh_token
+        : null;
     const expiresIn = Number(response.data?.expires_in ?? 0);
-    const expiresAt = Number.isFinite(expiresIn) && expiresIn > 0
-      ? new Date(Date.now() + expiresIn * 1000)
-      : null;
+    const expiresAt =
+      Number.isFinite(expiresIn) && expiresIn > 0
+        ? new Date(Date.now() + expiresIn * 1000)
+        : null;
 
     await this.providerTokenModel
       .findOneAndUpdate(
@@ -115,7 +123,9 @@ export class MobilityUberAuthService {
       .exec();
 
     const connected = Boolean(tokenDoc?.encryptedAccessToken);
-    const expired = tokenDoc?.expiresAt ? tokenDoc.expiresAt.getTime() <= Date.now() : false;
+    const expired = tokenDoc?.expiresAt
+      ? tokenDoc.expiresAt.getTime() <= Date.now()
+      : false;
 
     return {
       connected,

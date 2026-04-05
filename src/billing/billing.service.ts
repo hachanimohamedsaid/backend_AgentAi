@@ -42,13 +42,17 @@ export class BillingService {
         : this.config.get<string>('STRIPE_PRICE_MONTHLY');
 
     if (!priceId) {
-      throw new BadRequestException('Stripe price not configured for this plan');
+      throw new BadRequestException(
+        'Stripe price not configured for this plan',
+      );
     }
 
     const rawSuccessUrl = this.config.get<string>('STRIPE_SUCCESS_URL');
     const rawCancelUrl = this.config.get<string>('STRIPE_CANCEL_URL');
     if (!rawSuccessUrl || !rawCancelUrl) {
-      throw new BadRequestException('STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL required');
+      throw new BadRequestException(
+        'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL required',
+      );
     }
 
     const successUrl = this.buildStripeUrl(rawSuccessUrl, plan);
@@ -88,15 +92,22 @@ export class BillingService {
       }
       return session.url;
     } catch (err) {
-      if (err instanceof BadRequestException || err instanceof InternalServerErrorException) {
+      if (
+        err instanceof BadRequestException ||
+        err instanceof InternalServerErrorException
+      ) {
         throw err;
       }
       if (err instanceof Stripe.errors.StripeError) {
         this.logger.error(`Stripe error: ${err.type} ${err.message}`);
-        throw new InternalServerErrorException('Unable to create checkout session');
+        throw new InternalServerErrorException(
+          'Unable to create checkout session',
+        );
       }
       this.logger.error('Unexpected error creating checkout session', err);
-      throw new InternalServerErrorException('Unable to create checkout session');
+      throw new InternalServerErrorException(
+        'Unable to create checkout session',
+      );
     }
   }
 

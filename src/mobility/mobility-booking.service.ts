@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -59,7 +63,14 @@ export class MobilityBookingService {
 
   async updateStatusByProposalId(
     proposalId: string,
-    status: 'PENDING_PROVIDER' | 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'CANCELED' | 'EXPIRED' | 'COMPLETED',
+    status:
+      | 'PENDING_PROVIDER'
+      | 'ACCEPTED'
+      | 'REJECTED'
+      | 'FAILED'
+      | 'CANCELED'
+      | 'EXPIRED'
+      | 'COMPLETED',
     options?: {
       providerBookingRef?: string | null;
       providerPayloadLast?: Record<string, unknown> | null;
@@ -84,34 +95,52 @@ export class MobilityBookingService {
     }
 
     const current = booking.status;
-    const currentIsTerminal = ['ACCEPTED', 'REJECTED', 'FAILED', 'CANCELED', 'EXPIRED', 'COMPLETED'].includes(current);
+    const currentIsTerminal = [
+      'ACCEPTED',
+      'REJECTED',
+      'FAILED',
+      'CANCELED',
+      'EXPIRED',
+      'COMPLETED',
+    ].includes(current);
     const canAdvanceTerminal = current === 'ACCEPTED' && status === 'COMPLETED';
     if (currentIsTerminal && !canAdvanceTerminal) {
       return booking;
     }
 
     booking.status = status;
-    booking.providerBookingRef = options?.providerBookingRef ?? booking.providerBookingRef ?? null;
-    booking.providerPayloadLast = options?.providerPayloadLast ?? booking.providerPayloadLast ?? null;
+    booking.providerBookingRef =
+      options?.providerBookingRef ?? booking.providerBookingRef ?? null;
+    booking.providerPayloadLast =
+      options?.providerPayloadLast ?? booking.providerPayloadLast ?? null;
     booking.tripStatus = options?.tripStatus ?? booking.tripStatus ?? null;
-    booking.userDecisionRequired = options?.userDecisionRequired ?? booking.userDecisionRequired ?? false;
-    booking.userDriverDecision = options?.userDriverDecision ?? booking.userDriverDecision ?? null;
+    booking.userDecisionRequired =
+      options?.userDecisionRequired ?? booking.userDecisionRequired ?? false;
+    booking.userDriverDecision =
+      options?.userDriverDecision ?? booking.userDriverDecision ?? null;
     booking.driverName = options?.driverName ?? booking.driverName ?? null;
     booking.driverPhone = options?.driverPhone ?? booking.driverPhone ?? null;
-    booking.vehiclePlate = options?.vehiclePlate ?? booking.vehiclePlate ?? null;
-    booking.vehicleModel = options?.vehicleModel ?? booking.vehicleModel ?? null;
+    booking.vehiclePlate =
+      options?.vehiclePlate ?? booking.vehiclePlate ?? null;
+    booking.vehicleModel =
+      options?.vehicleModel ?? booking.vehicleModel ?? null;
     booking.etaMinutes = options?.etaMinutes ?? booking.etaMinutes;
-    booking.driverLatitude = options?.driverLatitude ?? booking.driverLatitude ?? null;
-    booking.driverLongitude = options?.driverLongitude ?? booking.driverLongitude ?? null;
+    booking.driverLatitude =
+      options?.driverLatitude ?? booking.driverLatitude ?? null;
+    booking.driverLongitude =
+      options?.driverLongitude ?? booking.driverLongitude ?? null;
     booking.errorMessage = options?.errorMessage ?? null;
     booking.failureCode = options?.failureCode ?? booking.failureCode ?? null;
-    booking.failureMessage = options?.failureMessage ?? booking.failureMessage ?? null;
+    booking.failureMessage =
+      options?.failureMessage ?? booking.failureMessage ?? null;
     await booking.save();
     return booking;
   }
 
   async findByIdForUser(bookingId: string, userId: string) {
-    const byId = await this.bookingModel.findOne({ _id: bookingId, userId }).exec();
+    const byId = await this.bookingModel
+      .findOne({ _id: bookingId, userId })
+      .exec();
     if (byId) {
       return byId;
     }
@@ -137,8 +166,10 @@ export class MobilityBookingService {
     const tripStatus = booking.tripStatus ?? '';
     const decisionable =
       booking.status === 'ACCEPTED' &&
-      ((booking.userDecisionRequired === true && pendingUserDecisionStates.includes(tripStatus)) ||
-        (booking.userDecisionRequired !== true && pendingUserDecisionStates.includes(tripStatus)));
+      ((booking.userDecisionRequired === true &&
+        pendingUserDecisionStates.includes(tripStatus)) ||
+        (booking.userDecisionRequired !== true &&
+          pendingUserDecisionStates.includes(tripStatus)));
     if (!decisionable) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',
@@ -173,8 +204,10 @@ export class MobilityBookingService {
     const tripStatus = booking.tripStatus ?? '';
     const decisionable =
       booking.status === 'ACCEPTED' &&
-      ((booking.userDecisionRequired === true && pendingUserDecisionStates.includes(tripStatus)) ||
-        (booking.userDecisionRequired !== true && pendingUserDecisionStates.includes(tripStatus)));
+      ((booking.userDecisionRequired === true &&
+        pendingUserDecisionStates.includes(tripStatus)) ||
+        (booking.userDecisionRequired !== true &&
+          pendingUserDecisionStates.includes(tripStatus)));
     if (!decisionable) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',
@@ -194,6 +227,10 @@ export class MobilityBookingService {
   }
 
   async listForUser(userId: string) {
-    return this.bookingModel.find({ userId }).sort({ createdAt: -1 }).limit(100).exec();
+    return this.bookingModel
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .exec();
   }
 }

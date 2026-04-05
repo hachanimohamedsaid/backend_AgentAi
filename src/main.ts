@@ -34,7 +34,8 @@ async function bootstrap() {
       res.setHeader('Content-Type', register.contentType);
       res.end(await register.metrics());
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to collect metrics';
+      const message =
+        err instanceof Error ? err.message : 'Failed to collect metrics';
       res.status(500).end(message);
     }
   });
@@ -51,8 +52,12 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`[App] NestJS server listening on port ${port}`);
-  console.log(`[App] Metrics endpoint available at http://localhost:${port}/metrics`);
-  console.log(`[App] Health endpoint available at http://localhost:${port}/health`);
+  console.log(
+    `[App] Metrics endpoint available at http://localhost:${port}/metrics`,
+  );
+  console.log(
+    `[App] Health endpoint available at http://localhost:${port}/health`,
+  );
 }
 
 bootstrap().catch((err) => {

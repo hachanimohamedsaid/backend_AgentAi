@@ -220,8 +220,7 @@ export class MeetingService {
     }
 
     const roomId =
-      (dto.roomId ?? '').trim() ||
-      `intel_${new Types.ObjectId().toString()}`;
+      (dto.roomId ?? '').trim() || `intel_${new Types.ObjectId().toString()}`;
     const title = (dto.title ?? '').trim() || this.defaultTitle();
     const payload: Record<string, unknown> = {
       title,
@@ -266,8 +265,7 @@ export class MeetingService {
     }
 
     const roomId =
-      (dto.roomId ?? '').trim() ||
-      `intel_${new Types.ObjectId().toString()}`;
+      (dto.roomId ?? '').trim() || `intel_${new Types.ObjectId().toString()}`;
     const title = (dto.title ?? '').trim() || this.defaultTitle();
     const payload: Record<string, unknown> = {
       title,
@@ -310,8 +308,7 @@ export class MeetingService {
     return {
       id,
       status: 'draft',
-      confirmationText:
-        'Saved. Continue with deal details in the next step.',
+      confirmationText: 'Saved. Continue with deal details in the next step.',
     };
   }
 
@@ -359,12 +356,14 @@ export class MeetingService {
   /** Flutter loading screen `GET /meetings/:id/status`. */
   async getMeetingUiStatus(id: string): Promise<{ status: string }> {
     const meeting = await this.getDocForUpdate(id);
-    const confirmed = (meeting as any).briefing?.confirmedAt;
+    const confirmed = meeting.briefing?.confirmedAt;
     return { status: confirmed ? 'ready' : 'pending' };
   }
 
   /** Final report in the shape expected by Flutter `ReportResult`. */
-  async getFlutterFinalReport(id: string): Promise<Record<string, unknown> | null> {
+  async getFlutterFinalReport(
+    id: string,
+  ): Promise<Record<string, unknown> | null> {
     const meeting = await this.findOne(id);
     const fr = (meeting as any).finalReport as Record<string, unknown> | null;
     if (!fr || typeof fr !== 'object') return null;
@@ -471,7 +470,7 @@ export class MeetingService {
 
   async confirmContext(id: string): Promise<any> {
     const meeting = await this.getDocForUpdate(id);
-    const ctx = (meeting.meetingContext ?? {}) as any;
+    const ctx = meeting.meetingContext ?? {};
     const inv = ctx?.investor ?? {};
     const firm = inv.firm || inv.company;
     const locationLine = inv.city || inv.location;
@@ -501,10 +500,14 @@ export class MeetingService {
       );
     }
     if (hasValuationLabel && !hasValuation) {
-      riskFlags.push('Valuation is only a label; numeric valuation helps offer analysis.');
+      riskFlags.push(
+        'Valuation is only a label; numeric valuation helps offer analysis.',
+      );
     }
     if (!meeting.documents?.length) {
-      riskFlags.push('No documents uploaded; briefings will rely on assumptions.');
+      riskFlags.push(
+        'No documents uploaded; briefings will rely on assumptions.',
+      );
     }
 
     const confirmationSummary =
@@ -514,7 +517,9 @@ export class MeetingService {
 
     const assumptions: string[] = [];
     if (!ctx?.deal?.targetAmount && !ctx?.deal?.targetAmountLabel) {
-      assumptions.push('Investment target not specified; using deal context only.');
+      assumptions.push(
+        'Investment target not specified; using deal context only.',
+      );
     }
 
     const briefingVersion = `v_${new Date().toISOString()}`;
@@ -611,15 +616,12 @@ export class MeetingService {
 
   async simulationStart(id: string, dto: SimulationStartDto): Promise<any> {
     const meeting = await this.getDocForUpdate(id);
-    const ctx = (meeting.meetingContext ?? {}) as any;
+    const ctx = meeting.meetingContext ?? {};
     const inv = ctx?.investor ?? {};
-    const personaName =
-      dto.personaName?.trim() ||
-      inv.name ||
-      'Investor';
+    const personaName = dto.personaName?.trim() || inv.name || 'Investor';
     const personaArchetype =
       dto.personaArchetype?.trim() ||
-      (meeting.briefing as any)?.profile?.archetypeTags?.[0] ||
+      meeting.briefing?.profile?.archetypeTags?.[0] ||
       'Analytical';
 
     meeting.simulation = {
@@ -647,7 +649,7 @@ export class MeetingService {
     if (apiKeyStart) {
       try {
         const openai = new OpenAI({ apiKey: apiKeyStart });
-        const profile = (meeting.briefing as any)?.profile ?? {};
+        const profile = meeting.briefing?.profile ?? {};
         const sys = `You write the FIRST message in a founder–investor negotiation role-play.
 The investor is ${personaName} (${personaArchetype}). They do NOT greet or make small talk.
 They open with a sharp, analytical CHALLENGE tied to the founder's deal (valuation, stage, sector, traction).
@@ -737,7 +739,7 @@ Rules: 1–3 sentences; first person as the investor; specific and testing; no m
           this.getSystemPromptForSimulationTurn(exchangeIndex);
         const ctx = meeting.meetingContext ?? {};
         const docs = Array.isArray(meeting.documents) ? meeting.documents : [];
-        const profile = (meeting.briefing as any)?.profile ?? {};
+        const profile = meeting.briefing?.profile ?? {};
         const payload = {
           meetingContext: ctx,
           investorPsychProfile: profile,
@@ -771,7 +773,9 @@ Rules: 1–3 sentences; first person as the investor; specific and testing; no m
         coachFeedback = parsed?.coachFeedback ?? coachFeedback;
         scores = parsed?.scores ?? scores;
         nextInvestorGoal = String(parsed?.nextInvestorGoal ?? nextInvestorGoal);
-        llmFeedback = String(parsed?.feedback ?? parsed?.observation ?? '').trim();
+        llmFeedback = String(
+          parsed?.feedback ?? parsed?.observation ?? '',
+        ).trim();
         llmSuggested = String(parsed?.suggestedImprovement ?? '').trim();
         llmColor =
           parsed?.color != null
@@ -840,7 +844,7 @@ Rules: 1–3 sentences; first person as the investor; specific and testing; no m
       .toLowerCase()
       .trim();
     if (cr === 'green' || cr === 'amber' || cr === 'red') {
-      colorOut = cr as 'green' | 'amber' | 'red';
+      colorOut = cr;
     }
     if (colorOut === 'green' && !llmSuggested) {
       suggestedImp = '';
@@ -1244,9 +1248,12 @@ Return JSON with:
       const msg = pick(rotation[(exchangeIndex + k) % rotation.length]);
       if (msg) return msg;
     }
-    return pick(
-      `Stay on substance: what's the riskiest part of the plan, and what have you done in the last 60 days to de-risk it?`,
-    ) ?? `Pick one claim you just made and defend it with a named proof point — otherwise we're stuck.`;
+    return (
+      pick(
+        `Stay on substance: what's the riskiest part of the plan, and what have you done in the last 60 days to de-risk it?`,
+      ) ??
+      `Pick one claim you just made and defend it with a named proof point — otherwise we're stuck.`
+    );
   }
 
   private heuristicCoachFeedback(userText: string): {
@@ -1488,7 +1495,8 @@ SIMULATION: The payload includes "simulation" with turns and scores arrays (conf
         meta,
       };
     }
-    const primaryCity = city || (geo.includes(',') ? geo.split(',')[0].trim() : geo);
+    const primaryCity =
+      city || (geo.includes(',') ? geo.split(',')[0].trim() : geo);
     return {
       recommendations: [
         {
@@ -1499,11 +1507,16 @@ SIMULATION: The payload includes "simulation" with turns and scores arrays (conf
           why: primaryCity
             ? `Low noise and privacy suit investor diligence in ${primaryCity}.`
             : 'Private, low noise, professional setting.',
-          bestFor: fmt ? `${fmt} investor meetings` : 'Formal investor meetings',
+          bestFor: fmt
+            ? `${fmt} investor meetings`
+            : 'Formal investor meetings',
           caution: 'Book ahead at peak hours',
         },
       ],
-      avoidAreas: ['Very noisy restaurants', 'Tourist-trap spots that signal poor judgment'],
+      avoidAreas: [
+        'Very noisy restaurants',
+        'Tourist-trap spots that signal poor judgment',
+      ],
       bookingNotes: ['Arrive 10 minutes early.'],
       meta,
     };

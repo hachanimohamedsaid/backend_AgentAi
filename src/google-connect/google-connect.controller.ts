@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -27,9 +21,11 @@ export class GoogleConnectController {
   /** Returns the current Google connect status for the authenticated user. */
   @Get('status')
   @UseGuards(JwtAuthGuard)
-  async getStatus(
-    @CurrentUser() user: UserDocument,
-  ): Promise<{ connected: boolean; googleEmail: string | null; sheetReady: boolean }> {
+  async getStatus(@CurrentUser() user: UserDocument): Promise<{
+    connected: boolean;
+    googleEmail: string | null;
+    sheetReady: boolean;
+  }> {
     const userId = (user as any)._id?.toString() ?? (user as any).id;
     return this.googleConnectService.getStatus(userId);
   }
@@ -47,7 +43,9 @@ export class GoogleConnectController {
     @Res() res: Response,
   ): Promise<void> {
     if (error || !code || !state) {
-      res.status(400).send(this.buildHtmlPage('error', error ?? 'Missing code or state'));
+      res
+        .status(400)
+        .send(this.buildHtmlPage('error', error ?? 'Missing code or state'));
       return;
     }
 

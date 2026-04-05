@@ -25,4 +25,3 @@ export class AssistantFeedbackDto {
   @IsString()
   type?: string;
 }
-

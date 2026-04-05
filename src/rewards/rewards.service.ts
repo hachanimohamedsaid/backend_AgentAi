@@ -10,8 +10,14 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Model } from 'mongoose';
 import { Resend } from 'resend';
-import { RewardCoupon, RewardCouponDocument } from './schemas/reward-coupon.schema';
-import { MonthlyWinner, MonthlyWinnerDocument } from './schemas/monthly-winner.schema';
+import {
+  RewardCoupon,
+  RewardCouponDocument,
+} from './schemas/reward-coupon.schema';
+import {
+  MonthlyWinner,
+  MonthlyWinnerDocument,
+} from './schemas/monthly-winner.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 
 @Injectable()
@@ -41,9 +47,17 @@ export class RewardsService {
 
   async runMonthlyWinnerJob(now: Date = new Date()) {
     const previousMonth = this.toMonthKey(this.startOfPreviousMonth(now));
-    const existing = await this.monthlyWinnerModel.findOne({ month: previousMonth }).lean().exec();
+    const existing = await this.monthlyWinnerModel
+      .findOne({ month: previousMonth })
+      .lean()
+      .exec();
     if (existing) {
-      return { status: 'already_ran', month: previousMonth, winnerUserId: existing.userId, couponCode: existing.couponCode };
+      return {
+        status: 'already_ran',
+        month: previousMonth,
+        winnerUserId: existing.userId,
+        couponCode: existing.couponCode,
+      };
     }
 
     const winner = await this.findMonthlyWinner(now);
@@ -52,7 +66,9 @@ export class RewardsService {
     }
 
     const couponCode = this.generateCouponCode(previousMonth);
-    const discountPercent = Number(this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ?? 30);
+    const discountPercent = Number(
+      this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ?? 30,
+    );
 
     const expiresAt = this.endOfMonth(now);
 
@@ -177,12 +193,15 @@ export class RewardsService {
       this.logger.warn(
         `Coupon missing for winner ${winner.month}, recreating: ${winner.couponCode}`,
       );
-      const discountPercent = Number(this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ?? 30);
-      
+      const discountPercent = Number(
+        this.configService.get<string>('MONTHLY_CHAMPION_DISCOUNT_PERCENT') ??
+          30,
+      );
+
       // Parse month string (YYYY-MM) to get proper date
       const [year, month] = winner.month.split('-').map(Number);
       const monthDate = new Date(Date.UTC(year, month - 1, 1));
-      
+
       // If the original expiration has already passed, extend it by 30 days from today
       let expiresAt = this.endOfMonth(monthDate);
       if (new Date() > expiresAt) {
@@ -209,7 +228,10 @@ export class RewardsService {
       }
     }
 
-    const winnerUser = await this.userModel.findById(winner.userId).lean().exec();
+    const winnerUser = await this.userModel
+      .findById(winner.userId)
+      .lean()
+      .exec();
     const winnerName = winnerUser?.name ?? 'Champion';
 
     await this.sendWinnerCouponEmail({
@@ -276,11 +298,14 @@ export class RewardsService {
   }): Promise<void> {
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!resendApiKey) {
-      this.logger.warn('RESEND_API_KEY not set. Monthly winner email was not sent.');
+      this.logger.warn(
+        'RESEND_API_KEY not set. Monthly winner email was not sent.',
+      );
       return;
     }
 
-    const emailFrom = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const emailFrom =
+      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const resend = new Resend(resendApiKey);
 
     const subject = `Monthly Champion Reward - ${data.month}`;
@@ -313,7 +338,9 @@ export class RewardsService {
         html,
       });
     } catch (error) {
-      this.logger.error(`Failed to send monthly winner email: ${String(error)}`);
+      this.logger.error(
+        `Failed to send monthly winner email: ${String(error)}`,
+      );
       throw new ServiceUnavailableException('monthly_winner_email_failed');
     }
   }
@@ -327,7 +354,7 @@ export class RewardsService {
   async generateTestCoupon() {
     const testCouponCode = `TEST-${Date.now().toString(36).toUpperCase()}`;
     const expiresAt = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    
+
     await this.rewardCouponModel.create({
       code: testCouponCode,
       userId: 'TEST-USER', // Special marker for test coupons
@@ -349,15 +376,29 @@ export class RewardsService {
   }
 
   private startOfMonth(date: Date): Date {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
   }
 
   private startOfPreviousMonth(date: Date): Date {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 0, 0, 0, 0));
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 0, 0, 0, 0),
+    );
   }
 
   private endOfMonth(date: Date): Date {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    return new Date(
+      Date.UTC(
+        date.getUTCFullYear(),
+        date.getUTCMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      ),
+    );
   }
 
   private generateCouponCode(month: string): string {

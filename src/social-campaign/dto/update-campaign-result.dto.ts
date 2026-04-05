@@ -7,7 +7,11 @@ export class UpdateCampaignResultDto {
 
   @IsString()
   @IsIn(
-    [CampaignStatus.Generating, CampaignStatus.Completed, CampaignStatus.Failed],
+    [
+      CampaignStatus.Generating,
+      CampaignStatus.Completed,
+      CampaignStatus.Failed,
+    ],
     {
       message: `status must be one of: generating, completed, failed`,
     },

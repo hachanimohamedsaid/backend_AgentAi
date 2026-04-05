@@ -114,7 +114,10 @@ export class MobilityProviderSimulatorController {
 
     if (existing) {
       existing.tripStatus = 'DRIVER_ARRIVING';
-      existing.driver.eta_minutes = Math.max(1, existing.driver.eta_minutes - 2);
+      existing.driver.eta_minutes = Math.max(
+        1,
+        existing.driver.eta_minutes - 2,
+      );
       this.rides.set(proposalId, existing);
       return {
         ok: true,
@@ -150,7 +153,8 @@ export class MobilityProviderSimulatorController {
       ok: true,
       status: 'REJECTED',
       trip_status: 'CANCELED_BY_USER',
-      providerBookingRef: existing?.providerBookingRef ?? body.providerBookingRef ?? null,
+      providerBookingRef:
+        existing?.providerBookingRef ?? body.providerBookingRef ?? null,
     };
   }
 

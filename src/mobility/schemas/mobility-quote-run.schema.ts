@@ -27,7 +27,11 @@ class QuoteOption {
   globalScore: number;
 }
 
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
+@Schema({
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+})
 export class MobilityQuoteRun {
   @Prop({ required: true, index: true })
   userId: string;
@@ -54,7 +58,8 @@ export class MobilityQuoteRun {
   updatedAt?: Date;
 }
 
-export const MobilityQuoteRunSchema = SchemaFactory.createForClass(MobilityQuoteRun);
+export const MobilityQuoteRunSchema =
+  SchemaFactory.createForClass(MobilityQuoteRun);
 
 MobilityQuoteRunSchema.set('toJSON', {
   transform: (_doc: unknown, ret: any) => {

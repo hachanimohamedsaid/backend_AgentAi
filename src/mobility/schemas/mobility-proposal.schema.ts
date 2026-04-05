@@ -45,7 +45,11 @@ class ProposalOption {
   globalScore: number;
 }
 
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
+@Schema({
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+})
 export class MobilityProposal {
   @Prop({ required: true, index: true })
   userId: string;
@@ -130,7 +134,8 @@ export class MobilityProposal {
   updatedAt?: Date;
 }
 
-export const MobilityProposalSchema = SchemaFactory.createForClass(MobilityProposal);
+export const MobilityProposalSchema =
+  SchemaFactory.createForClass(MobilityProposal);
 
 MobilityProposalSchema.set('toJSON', {
   transform: (_doc: unknown, ret: any) => {

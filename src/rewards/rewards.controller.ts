@@ -36,9 +36,7 @@ export class RewardsController {
 
   @Post(['rewards/monthly/run', 'api/rewards/monthly/run'])
   @HttpCode(HttpStatus.OK)
-  async runMonthlyRewards(
-    @Headers('x-internal-key') internalKey?: string,
-  ) {
+  async runMonthlyRewards(@Headers('x-internal-key') internalKey?: string) {
     const expected = this.configService.get<string>('REWARDS_RUN_SECRET');
     if (!expected || internalKey !== expected) {
       throw new ForbiddenException('forbidden');

@@ -23,7 +23,9 @@ export class MobilityQuotesService {
 
   async estimate(input: EstimateInput): Promise<QuoteOption[]> {
     const providers = ['uberx', 'uberxl'];
-    const seed = this.hash(`${input.from}|${input.to}|${input.pickupAt.toISOString()}`);
+    const seed = this.hash(
+      `${input.from}|${input.to}|${input.pickupAt.toISOString()}`,
+    );
     const hour = Number(
       new Intl.DateTimeFormat('en-GB', {
         hour: '2-digit',
@@ -43,7 +45,9 @@ export class MobilityQuotesService {
       const maxPrice = Number((minPrice + variance).toFixed(1));
       const etaMinutes = (isUberXL ? 5 : 4) + (providerSeed % 6);
       const confidenceBase = isUberXL ? 0.8 : 0.84;
-      const confidence = Number((confidenceBase + ((providerSeed % 12) / 100)).toFixed(2));
+      const confidence = Number(
+        (confidenceBase + (providerSeed % 12) / 100).toFixed(2),
+      );
 
       return {
         provider,
@@ -56,9 +60,15 @@ export class MobilityQuotesService {
     });
   }
 
-  private buildReasons(provider: string, peakFactor: number, confidence: number): string[] {
+  private buildReasons(
+    provider: string,
+    peakFactor: number,
+    confidence: number,
+  ): string[] {
     const reasons = [
-      peakFactor > 1 ? 'peak-hour demand detected' : 'stable traffic conditions',
+      peakFactor > 1
+        ? 'peak-hour demand detected'
+        : 'stable traffic conditions',
       confidence > 0.9
         ? 'high provider reliability for this route window'
         : 'moderate provider reliability for this route window',

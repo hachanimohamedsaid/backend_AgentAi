@@ -22,6 +22,7 @@ import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { GoogleConnectModule } from './google-connect/google-connect.module';
+import { WellbeingModule } from './wellbeing/wellbeing.module';
 import { RequestIdMiddleware } from './observability/request-id.middleware';
 import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
@@ -39,7 +40,8 @@ import { LoggerService } from './observability/logger.service';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
         const uri =
-          configService.get<string>('MONGO_URI') ?? configService.get<string>('MONGODB_URI');
+          configService.get<string>('MONGO_URI') ??
+          configService.get<string>('MONGODB_URI');
         if (!uri) {
           throw new Error(
             'MONGO_URI or MONGODB_URI is not defined. Set it in .env or in your deployment environment (e.g. Railway).',
@@ -49,9 +51,13 @@ import { LoggerService } from './observability/logger.service';
           uri,
           serverSelectionTimeoutMS: 15000,
           connectTimeoutMS: 15000,
-          connectionFactory: (connection: { on: (ev: string, fn: () => void) => void }) => {
+          connectionFactory: (connection: {
+            on: (ev: string, fn: () => void) => void;
+          }) => {
             connection.on('connected', () => {
-              console.log('[Mongoose] Successfully connected to MongoDB Atlas.');
+              console.log(
+                '[Mongoose] Successfully connected to MongoDB Atlas.',
+              );
             });
             connection.on('error', () => {
               console.error('[Mongoose] MongoDB connection error.');
@@ -80,6 +86,7 @@ import { LoggerService } from './observability/logger.service';
     ChallengesModule,
     RewardsModule,
     GoogleConnectModule,
+    WellbeingModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggerService],

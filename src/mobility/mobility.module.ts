@@ -9,7 +9,10 @@ import { MobilityAutomationService } from './mobility-automation.service';
 import { MobilityApprovalService } from './mobility-approval.service';
 import { MobilityBookingService } from './mobility-booking.service';
 import { MobilityUberAuthService } from './mobility-uber-auth.service';
-import { MobilityRule, MobilityRuleSchema } from './schemas/mobility-rule.schema';
+import {
+  MobilityRule,
+  MobilityRuleSchema,
+} from './schemas/mobility-rule.schema';
 import {
   MobilityQuoteRun,
   MobilityQuoteRunSchema,

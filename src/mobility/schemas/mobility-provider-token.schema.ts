@@ -21,4 +21,6 @@ export class MobilityProviderToken {
   expiresAt: Date | null;
 }
 
-export const MobilityProviderTokenSchema = SchemaFactory.createForClass(MobilityProviderToken);
+export const MobilityProviderTokenSchema = SchemaFactory.createForClass(
+  MobilityProviderToken,
+);

@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { randomUUID } from 'crypto';
 
-export type AssistantNotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type AssistantNotificationPriority =
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'urgent';
 
 export interface AssistantNotificationAction {
   label: string;
@@ -117,7 +121,7 @@ OUTPUT FORMAT (JSON array, max length = maxItems):
         err instanceof Error
           ? err.message
           : 'OpenAI notification request failed';
-      // eslint-disable-next-line no-console
+
       console.error('[OpenAiNotificationClient] Error:', msg);
       return [];
     }
@@ -156,16 +160,14 @@ OUTPUT FORMAT (JSON array, max length = maxItems):
                 return null;
               }
               const data =
-                a.data && typeof a.data === 'object' ? (a.data as any) : undefined;
+                a.data && typeof a.data === 'object' ? a.data : undefined;
               return { label: a.label.trim(), action: a.action.trim(), data };
             })
             .filter((v: any) => v !== null)
         : [];
 
       const dedupeKeyRaw =
-        item.meta && typeof item.meta === 'object'
-          ? (item.meta as any).dedupeKey
-          : null;
+        item.meta && typeof item.meta === 'object' ? item.meta.dedupeKey : null;
       const dedupeKey =
         typeof dedupeKeyRaw === 'string' && dedupeKeyRaw.trim().length > 0
           ? dedupeKeyRaw.trim()
@@ -173,7 +175,7 @@ OUTPUT FORMAT (JSON array, max length = maxItems):
 
       const expiresAtRaw =
         item.meta && typeof item.meta === 'object'
-          ? (item.meta as any).expiresAt
+          ? item.meta.expiresAt
           : undefined;
       const expiresAt =
         typeof expiresAtRaw === 'string' && expiresAtRaw.trim().length > 0
@@ -201,10 +203,13 @@ OUTPUT FORMAT (JSON array, max length = maxItems):
     }
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    if (
+      firstBracket !== -1 &&
+      lastBracket !== -1 &&
+      lastBracket > firstBracket
+    ) {
       return text.slice(firstBracket, lastBracket + 1);
     }
     return text;
   }
 }
-

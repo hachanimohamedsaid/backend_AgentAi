@@ -21,7 +21,9 @@ describe('MobilityBookingService', () => {
       errorMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     const res = await service.updateStatusByProposalId('prop-1', 'REJECTED', {
       errorMessage: 'should be ignored',
@@ -41,7 +43,9 @@ describe('MobilityBookingService', () => {
       errorMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     const res = await service.updateStatusByProposalId('prop-2', 'ACCEPTED', {
       providerBookingRef: 'prov-2',
@@ -66,9 +70,14 @@ describe('MobilityBookingService', () => {
       failureMessage: 'No driver',
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
-    const res = await service.updateStatusByProposalId('prop-3', 'PENDING_PROVIDER');
+    const res = await service.updateStatusByProposalId(
+      'prop-3',
+      'PENDING_PROVIDER',
+    );
 
     expect(res).toBe(booking);
     expect(booking.status).toBe('REJECTED');
@@ -86,7 +95,9 @@ describe('MobilityBookingService', () => {
       failureMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     await service.updateStatusByProposalId('prop-4', 'FAILED', {
       failureCode: 'PROVIDER_HTTP_500',
@@ -115,7 +126,9 @@ describe('MobilityBookingService', () => {
       errorMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     const res = await service.acceptDriver('book-1', 'user-1');
 
@@ -140,7 +153,9 @@ describe('MobilityBookingService', () => {
       errorMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     const res = await service.rejectDriver('book-2', 'user-1');
 
@@ -167,7 +182,9 @@ describe('MobilityBookingService', () => {
       errorMessage: null,
       save,
     };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(booking),
+    });
 
     const res = await service.acceptDriver('book-3', 'user-1');
 

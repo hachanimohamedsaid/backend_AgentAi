@@ -32,7 +32,9 @@ export class SocialCampaignService {
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
   private isValidObjectId(id: string): boolean {
-    return Types.ObjectId.isValid(id) && new Types.ObjectId(id).toString() === id;
+    return (
+      Types.ObjectId.isValid(id) && new Types.ObjectId(id).toString() === id
+    );
   }
 
   private toPlain(doc: any): any {
@@ -62,12 +64,16 @@ export class SocialCampaignService {
       sentAt: null,
     });
 
-    const campaignId = (doc._id as Types.ObjectId).toString();
-    this.logger.log(`Campaign created [${campaignId}] — triggering N8N webhook`);
+    const campaignId = doc._id.toString();
+    this.logger.log(
+      `Campaign created [${campaignId}] — triggering N8N webhook`,
+    );
 
     // 2. Fire-and-forget: call N8N, update campaign when done
     this.triggerN8nAndUpdate(campaignId, dto).catch((err) =>
-      this.logger.error(`N8N webhook failed for campaign [${campaignId}]: ${err.message}`),
+      this.logger.error(
+        `N8N webhook failed for campaign [${campaignId}]: ${err.message}`,
+      ),
     );
 
     // 3. Return immediately so Flutter can start polling
@@ -125,8 +131,7 @@ export class SocialCampaignService {
       const errMsg = err?.message ?? 'Unknown error';
       const errCode = err?.code;
       const isTimeout =
-        errCode === 'ECONNABORTED' ||
-        errMsg.toLowerCase().includes('timeout');
+        errCode === 'ECONNABORTED' || errMsg.toLowerCase().includes('timeout');
 
       if (isTimeout) {
         // Do not fail early on timeout; n8n may still finish and callback /:id/result.
@@ -136,7 +141,9 @@ export class SocialCampaignService {
         return;
       }
 
-      this.logger.error(`N8N call failed for campaign [${campaignId}]: ${errMsg}`);
+      this.logger.error(
+        `N8N call failed for campaign [${campaignId}]: ${errMsg}`,
+      );
 
       await this.campaignModel.findByIdAndUpdate(campaignId, {
         status: CampaignStatus.Failed,
@@ -178,9 +185,7 @@ export class SocialCampaignService {
       throw new NotFoundException(`Campaign ${id} not found`);
     }
 
-    this.logger.log(
-      `Campaign [${id}] result updated — status: ${dto.status}`,
-    );
+    this.logger.log(`Campaign [${id}] result updated — status: ${dto.status}`);
 
     return this.toPlain(doc);
   }
@@ -225,7 +230,9 @@ export class SocialCampaignService {
     campaign: CampaignDocument,
     dto: SendCampaignDto,
   ): Promise<void> {
-    const emailWebhookUrl = this.configService.get<string>('N8N_EMAIL_AGENT_WEBHOOK_URL');
+    const emailWebhookUrl = this.configService.get<string>(
+      'N8N_EMAIL_AGENT_WEBHOOK_URL',
+    );
 
     if (!emailWebhookUrl) {
       this.logger.warn(
@@ -234,7 +241,7 @@ export class SocialCampaignService {
       return;
     }
 
-    const campaignId = (campaign._id as Types.ObjectId).toString();
+    const campaignId = campaign._id.toString();
 
     try {
       await firstValueFrom(

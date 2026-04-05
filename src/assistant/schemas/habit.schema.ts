@@ -30,4 +30,3 @@ export class Habit {
 export const HabitSchema = SchemaFactory.createForClass(Habit);
 
 HabitSchema.index({ userId: 1, suggestionType: 1 }, { unique: true });
-

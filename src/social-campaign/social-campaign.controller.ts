@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { SocialCampaignService } from './social-campaign.service';
 import { CampaignBriefDto } from './dto/campaign-brief.dto';
 import { SendCampaignDto } from './dto/send-campaign.dto';
@@ -54,10 +48,7 @@ export class SocialCampaignController {
    * and triggers the N8N email agent with the report + recipient list.
    */
   @Post(':id/send')
-  async send(
-    @Param('id') id: string,
-    @Body() dto: SendCampaignDto,
-  ) {
+  async send(@Param('id') id: string, @Body() dto: SendCampaignDto) {
     return this.socialCampaignService.send(id, dto);
   }
 }

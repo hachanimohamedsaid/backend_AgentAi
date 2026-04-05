@@ -103,4 +103,3 @@ export class GenerateNotificationsDto {
   @Type(() => AssistantSignalDto)
   signals: AssistantSignalDto[];
 }
-

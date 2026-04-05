@@ -47,7 +47,10 @@ export class MobilityController {
 
   @Post('quotes/estimate')
   @HttpCode(HttpStatus.OK)
-  async estimate(@CurrentUser() user: UserDocument, @Body() dto: EstimateRideDto) {
+  async estimate(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: EstimateRideDto,
+  ) {
     const options = await this.quotesService.estimate({
       from: dto.from,
       to: dto.to,
@@ -64,7 +67,10 @@ export class MobilityController {
 
   @Post('rules')
   @HttpCode(HttpStatus.CREATED)
-  async createRule(@CurrentUser() user: UserDocument, @Body() dto: CreateMobilityRuleDto) {
+  async createRule(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: CreateMobilityRuleDto,
+  ) {
     const userId = (user as any)._id?.toString();
     const rule = await this.ruleModel.create({
       userId,
@@ -111,7 +117,10 @@ export class MobilityController {
 
   @Post('proposals')
   @HttpCode(HttpStatus.CREATED)
-  async createProposal(@CurrentUser() user: UserDocument, @Body() dto: CreateProposalDto) {
+  async createProposal(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: CreateProposalDto,
+  ) {
     const userId = (user as any)._id?.toString();
     return this.approvalService.createProposal(userId, dto);
   }
@@ -239,6 +248,10 @@ export class MobilityController {
       });
     }
 
-    return this.approvalService.handleProviderEvent(body.proposalId, body.eventType, body);
+    return this.approvalService.handleProviderEvent(
+      body.proposalId,
+      body.eventType,
+      body,
+    );
   }
 }

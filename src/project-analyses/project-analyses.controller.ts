@@ -18,12 +18,9 @@ export class ProjectAnalysesController {
   ) {}
 
   @Get(':rowNumber')
-  async findByRowNumber(
-    @Param('rowNumber', ParseIntPipe) rowNumber: number,
-  ) {
-    const analysis = await this.projectAnalysesService.findByRowNumber(
-      rowNumber,
-    );
+  async findByRowNumber(@Param('rowNumber', ParseIntPipe) rowNumber: number) {
+    const analysis =
+      await this.projectAnalysesService.findByRowNumber(rowNumber);
     return { analysis: analysis?.analysis || null };
   }
 

@@ -40,7 +40,8 @@ export class BillingController {
       );
     }
     this.successRedirectScheme =
-      this.configService.get<string>('STRIPE_SUCCESS_REDIRECT_SCHEME') || 'piagent://';
+      this.configService.get<string>('STRIPE_SUCCESS_REDIRECT_SCHEME') ||
+      'piagent://';
   }
 
   @UseGuards(JwtAuthGuard)
@@ -98,17 +99,25 @@ export class BillingController {
         this.logger.warn(`Failed to verify Stripe session: ${String(error)}`);
       }
     } else if (sessionId && !this.stripe) {
-      this.logger.warn('Skipping Stripe session verification because STRIPE_SECRET_KEY is missing.');
+      this.logger.warn(
+        'Skipping Stripe session verification because STRIPE_SECRET_KEY is missing.',
+      );
     }
 
     const deepLinkUrl = this.buildDeepLink('billing/success', plan);
-    return res.status(200).type('html').send(this.buildBridgeHtml(deepLinkUrl, 'Paiement confirme'));
+    return res
+      .status(200)
+      .type('html')
+      .send(this.buildBridgeHtml(deepLinkUrl, 'Paiement confirme'));
   }
 
   @Get('cancel')
   async handleStripeCancel(@Res() res: Response, @Query('plan') plan?: string) {
     const deepLinkUrl = this.buildDeepLink('billing/cancel', plan || 'unknown');
-    return res.status(200).type('html').send(this.buildBridgeHtml(deepLinkUrl, 'Paiement annule'));
+    return res
+      .status(200)
+      .type('html')
+      .send(this.buildBridgeHtml(deepLinkUrl, 'Paiement annule'));
   }
 
   private buildDeepLink(path: string, plan: string): string {

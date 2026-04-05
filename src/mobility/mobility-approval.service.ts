@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -75,7 +79,10 @@ export class MobilityApprovalService {
   async getPending(userId: string) {
     await this.expireStaleProposals(userId);
     const proposals = await this.proposalModel
-      .find({ userId, status: { $in: ['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'] } })
+      .find({
+        userId,
+        status: { $in: ['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'] },
+      })
       .sort({ createdAt: -1 })
       .limit(50)
       .exec();
@@ -88,7 +95,9 @@ export class MobilityApprovalService {
       userId,
     });
 
-    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
+    const proposal = await this.proposalModel
+      .findOne({ _id: proposalId, userId })
+      .exec();
 
     if (!proposal) {
       throw new NotFoundException({
@@ -107,7 +116,16 @@ export class MobilityApprovalService {
       };
     }
 
-    if (['ACCEPTED', 'REJECTED', 'FAILED', 'EXPIRED', 'CANCELED', 'COMPLETED'].includes(proposal.status)) {
+    if (
+      [
+        'ACCEPTED',
+        'REJECTED',
+        'FAILED',
+        'EXPIRED',
+        'CANCELED',
+        'COMPLETED',
+      ].includes(proposal.status)
+    ) {
       return {
         ok: true,
         proposalId: (proposal as any)._id?.toString(),
@@ -133,7 +151,10 @@ export class MobilityApprovalService {
       });
     }
 
-    const booking = await this.bookingService.createPendingFromProposal(userId, proposal);
+    const booking = await this.bookingService.createPendingFromProposal(
+      userId,
+      proposal,
+    );
     this.logEvent('mobility.confirm.saved_pending_provider', {
       proposalId: (proposal as any)._id?.toString(),
       bookingId: (booking as any)?._id?.toString(),
@@ -148,7 +169,11 @@ export class MobilityApprovalService {
     proposal.bookingId = (booking as any)._id?.toString() ?? null;
     await proposal.save();
 
-    this.enqueueProviderDispatch((proposal as any)._id?.toString(), proposal.bookingId ?? '', userId);
+    this.enqueueProviderDispatch(
+      (proposal as any)._id?.toString(),
+      proposal.bookingId ?? '',
+      userId,
+    );
 
     return {
       ok: true,
@@ -160,7 +185,9 @@ export class MobilityApprovalService {
   }
 
   async reject(userId: string, proposalId: string) {
-    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
+    const proposal = await this.proposalModel
+      .findOne({ _id: proposalId, userId })
+      .exec();
 
     if (!proposal) {
       throw new NotFoundException({
@@ -169,20 +196,28 @@ export class MobilityApprovalService {
       });
     }
 
-    if (!['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'].includes(proposal.status)) {
+    if (
+      !['PENDING_USER_APPROVAL', 'PENDING_PROVIDER'].includes(proposal.status)
+    ) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',
         message: `Cannot reject proposal from state ${proposal.status}`,
       });
     }
 
-    proposal.status = proposal.status === 'PENDING_PROVIDER' ? 'CANCELED' : 'REJECTED';
+    proposal.status =
+      proposal.status === 'PENDING_PROVIDER' ? 'CANCELED' : 'REJECTED';
     proposal.rejectedAt = new Date();
     await proposal.save();
 
-    await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), proposal.status, {
-      errorMessage: proposal.status === 'CANCELED' ? 'Canceled by user' : null,
-    });
+    await this.bookingService.updateStatusByProposalId(
+      (proposal as any)._id.toString(),
+      proposal.status,
+      {
+        errorMessage:
+          proposal.status === 'CANCELED' ? 'Canceled by user' : null,
+      },
+    );
 
     return {
       ok: true,
@@ -192,7 +227,9 @@ export class MobilityApprovalService {
   }
 
   async cancel(userId: string, proposalId: string) {
-    const proposal = await this.proposalModel.findOne({ _id: proposalId, userId }).exec();
+    const proposal = await this.proposalModel
+      .findOne({ _id: proposalId, userId })
+      .exec();
 
     if (!proposal) {
       throw new NotFoundException({
@@ -201,7 +238,9 @@ export class MobilityApprovalService {
       });
     }
 
-    if (['ACCEPTED', 'COMPLETED', 'FAILED', 'EXPIRED'].includes(proposal.status)) {
+    if (
+      ['ACCEPTED', 'COMPLETED', 'FAILED', 'EXPIRED'].includes(proposal.status)
+    ) {
       throw new ConflictException({
         code: 'INVALID_STATE_TRANSITION',
         message: `Cannot cancel proposal from state ${proposal.status}`,
@@ -214,9 +253,13 @@ export class MobilityApprovalService {
       await proposal.save();
     }
 
-    await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), 'CANCELED', {
-      errorMessage: 'Canceled by user',
-    });
+    await this.bookingService.updateStatusByProposalId(
+      (proposal as any)._id.toString(),
+      'CANCELED',
+      {
+        errorMessage: 'Canceled by user',
+      },
+    );
 
     return {
       ok: true,
@@ -244,7 +287,12 @@ export class MobilityApprovalService {
       live.tripStatus === 'DRIVER_PROPOSED' ||
       live.tripStatus === 'AWAITING_USER_CONFIRMATION' ||
       live.tripStatus === 'AWAITING_USER_DECISION';
-    let targetStatus: 'ACCEPTED' | 'REJECTED' | 'FAILED' | 'EXPIRED' | 'COMPLETED';
+    let targetStatus:
+      | 'ACCEPTED'
+      | 'REJECTED'
+      | 'FAILED'
+      | 'EXPIRED'
+      | 'COMPLETED';
 
     if (normalized === 'DRIVER_ACCEPTED') {
       targetStatus = 'ACCEPTED';
@@ -258,7 +306,8 @@ export class MobilityApprovalService {
 
     const oldStatus = proposal.status;
     if (this.isTerminalStatus(oldStatus)) {
-      const canAdvance = oldStatus === 'ACCEPTED' && targetStatus === 'COMPLETED';
+      const canAdvance =
+        oldStatus === 'ACCEPTED' && targetStatus === 'COMPLETED';
       if (!canAdvance) {
         return {
           ok: true,
@@ -281,42 +330,51 @@ export class MobilityApprovalService {
       provider: proposal.selectedProvider ?? proposal.best.provider,
     });
 
-    const booking = await this.bookingService.updateStatusByProposalId((proposal as any)._id.toString(), targetStatus, {
-      providerBookingRef:
-        typeof payload?.providerBookingRef === 'string'
-          ? payload.providerBookingRef
-          : null,
-      tripStatus:
-        targetStatus === 'ACCEPTED'
-          ? live.tripStatus ?? 'DRIVER_ARRIVING'
-          : targetStatus === 'COMPLETED'
-            ? 'COMPLETED'
-            : live.tripStatus,
-      userDecisionRequired:
-        targetStatus === 'ACCEPTED' ? decisionRequiredFromProvider : false,
-      userDriverDecision:
-        targetStatus === 'ACCEPTED' ? null : null,
-      driverName: live.driverName,
-      driverPhone: live.driverPhone,
-      vehiclePlate: live.vehiclePlate,
-      vehicleModel: live.vehicleModel,
-      etaMinutes: live.etaMinutes,
-      driverLatitude: live.driverLatitude,
-      driverLongitude: live.driverLongitude,
-      providerPayloadLast: payload ?? null,
-      failureCode:
-        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
-          ? String(payload?.errorCode ?? normalized)
-          : null,
-      failureMessage:
-        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
-          ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
-          : null,
-      errorMessage:
-        targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
-          ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
-          : null,
-    });
+    const booking = await this.bookingService.updateStatusByProposalId(
+      (proposal as any)._id.toString(),
+      targetStatus,
+      {
+        providerBookingRef:
+          typeof payload?.providerBookingRef === 'string'
+            ? payload.providerBookingRef
+            : null,
+        tripStatus:
+          targetStatus === 'ACCEPTED'
+            ? (live.tripStatus ?? 'DRIVER_ARRIVING')
+            : targetStatus === 'COMPLETED'
+              ? 'COMPLETED'
+              : live.tripStatus,
+        userDecisionRequired:
+          targetStatus === 'ACCEPTED' ? decisionRequiredFromProvider : false,
+        userDriverDecision: targetStatus === 'ACCEPTED' ? null : null,
+        driverName: live.driverName,
+        driverPhone: live.driverPhone,
+        vehiclePlate: live.vehiclePlate,
+        vehicleModel: live.vehicleModel,
+        etaMinutes: live.etaMinutes,
+        driverLatitude: live.driverLatitude,
+        driverLongitude: live.driverLongitude,
+        providerPayloadLast: payload ?? null,
+        failureCode:
+          targetStatus === 'FAILED' ||
+          targetStatus === 'REJECTED' ||
+          targetStatus === 'EXPIRED'
+            ? String(payload?.errorCode ?? normalized)
+            : null,
+        failureMessage:
+          targetStatus === 'FAILED' ||
+          targetStatus === 'REJECTED' ||
+          targetStatus === 'EXPIRED'
+            ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
+            : null,
+        errorMessage:
+          targetStatus === 'FAILED' ||
+          targetStatus === 'REJECTED' ||
+          targetStatus === 'EXPIRED'
+            ? String(payload?.errorMessage ?? `Provider event: ${normalized}`)
+            : null,
+      },
+    );
 
     this.logEvent('mobility.booking.status.updated', {
       providerEvent: normalized,
@@ -327,9 +385,12 @@ export class MobilityApprovalService {
       userId: proposal.userId,
       provider: proposal.selectedProvider ?? proposal.best.provider,
       providerBookingRef: (booking as any)?.providerBookingRef ?? null,
-      errorCode: targetStatus === 'FAILED' || targetStatus === 'REJECTED' || targetStatus === 'EXPIRED'
-        ? String(payload?.errorCode ?? normalized)
-        : null,
+      errorCode:
+        targetStatus === 'FAILED' ||
+        targetStatus === 'REJECTED' ||
+        targetStatus === 'EXPIRED'
+          ? String(payload?.errorCode ?? normalized)
+          : null,
     });
 
     return {
@@ -342,7 +403,10 @@ export class MobilityApprovalService {
   }
 
   async acceptDriver(userId: string, bookingId: string) {
-    const currentBooking = await this.bookingService.findByIdForUser(bookingId, userId);
+    const currentBooking = await this.bookingService.findByIdForUser(
+      bookingId,
+      userId,
+    );
     if (!currentBooking) {
       throw new NotFoundException({
         code: 'BOOKING_NOT_FOUND',
@@ -353,7 +417,9 @@ export class MobilityApprovalService {
     await this.callProviderDriverDecision('accept', currentBooking);
     const booking = await this.bookingService.acceptDriver(bookingId, userId);
 
-    const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
+    const proposal = await this.proposalModel
+      .findOne({ _id: booking.proposalId, userId })
+      .exec();
     if (!proposal) {
       throw new NotFoundException({
         code: 'PROPOSAL_NOT_FOUND',
@@ -378,7 +444,10 @@ export class MobilityApprovalService {
   }
 
   async rejectDriver(userId: string, bookingId: string) {
-    const currentBooking = await this.bookingService.findByIdForUser(bookingId, userId);
+    const currentBooking = await this.bookingService.findByIdForUser(
+      bookingId,
+      userId,
+    );
     if (!currentBooking) {
       throw new NotFoundException({
         code: 'BOOKING_NOT_FOUND',
@@ -389,7 +458,9 @@ export class MobilityApprovalService {
     await this.callProviderDriverDecision('reject', currentBooking);
     const booking = await this.bookingService.rejectDriver(bookingId, userId);
 
-    const proposal = await this.proposalModel.findOne({ _id: booking.proposalId, userId }).exec();
+    const proposal = await this.proposalModel
+      .findOne({ _id: booking.proposalId, userId })
+      .exec();
     if (!proposal) {
       throw new NotFoundException({
         code: 'PROPOSAL_NOT_FOUND',
@@ -413,7 +484,11 @@ export class MobilityApprovalService {
     };
   }
 
-  private enqueueProviderDispatch(proposalId: string, bookingId: string, userId: string) {
+  private enqueueProviderDispatch(
+    proposalId: string,
+    bookingId: string,
+    userId: string,
+  ) {
     this.logEvent('mobility.dispatch.enqueued', {
       proposalId,
       bookingId,
@@ -425,7 +500,11 @@ export class MobilityApprovalService {
     });
   }
 
-  private async dispatchProviderRequest(proposalId: string, bookingId: string, userId: string) {
+  private async dispatchProviderRequest(
+    proposalId: string,
+    bookingId: string,
+    userId: string,
+  ) {
     this.logEvent('mobility.dispatch.started', {
       proposalId,
       bookingId,
@@ -441,13 +520,21 @@ export class MobilityApprovalService {
       this.configService.get<string>('PROVIDER_BASE_URL') ??
       this.configService.get<string>('UBER_DISPATCH_API_URL');
     const allowLocalFallback =
-      (this.configService.get<string>('MOBILITY_ALLOW_LOCAL_FALLBACK') ?? 'false').toLowerCase() === 'true';
+      (
+        this.configService.get<string>('MOBILITY_ALLOW_LOCAL_FALLBACK') ??
+        'false'
+      ).toLowerCase() === 'true';
     const requireRealProvider =
-      (this.configService.get<string>('MOBILITY_REQUIRE_REAL_PROVIDER') ?? 'false').toLowerCase() === 'true';
+      (
+        this.configService.get<string>('MOBILITY_REQUIRE_REAL_PROVIDER') ??
+        'false'
+      ).toLowerCase() === 'true';
     const dispatchToken =
       this.configService.get<string>('PROVIDER_API_KEY') ??
       this.configService.get<string>('UBER_SERVER_TOKEN');
-    const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
+    const timeoutMs = Number(
+      this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000',
+    );
 
     if (!dispatchUrl && allowLocalFallback && !requireRealProvider) {
       const localRef = `local-${proposalId}-${Date.now()}`;
@@ -536,9 +623,12 @@ export class MobilityApprovalService {
           pickupAt: proposal.pickupAt,
         },
         {
-          timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+          timeout:
+            Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
           headers: {
-            ...(dispatchToken ? { Authorization: `Bearer ${dispatchToken}` } : {}),
+            ...(dispatchToken
+              ? { Authorization: `Bearer ${dispatchToken}` }
+              : {}),
             'Content-Type': 'application/json',
           },
         },
@@ -554,12 +644,18 @@ export class MobilityApprovalService {
       });
 
       const providerStatus = String(response.data?.status ?? '').toUpperCase();
-      if (providerStatus === 'ACCEPTED' || providerStatus === 'DRIVER_ACCEPTED') {
+      if (
+        providerStatus === 'ACCEPTED' ||
+        providerStatus === 'DRIVER_ACCEPTED'
+      ) {
         await this.handleProviderEvent(proposalId, 'DRIVER_ACCEPTED', {
           providerBookingRef: response.data?.providerBookingRef ?? null,
           raw: response.data,
         });
-      } else if (providerStatus === 'REJECTED' || providerStatus === 'DRIVER_NOT_FOUND') {
+      } else if (
+        providerStatus === 'REJECTED' ||
+        providerStatus === 'DRIVER_NOT_FOUND'
+      ) {
         await this.handleProviderEvent(proposalId, 'DRIVER_NOT_FOUND', {
           raw: response.data,
         });
@@ -567,7 +663,10 @@ export class MobilityApprovalService {
         await this.handleProviderEvent(proposalId, 'TIMEOUT', {
           raw: response.data,
         });
-      } else if (providerStatus && !['PENDING', 'PROCESSING', 'QUEUED'].includes(providerStatus)) {
+      } else if (
+        providerStatus &&
+        !['PENDING', 'PROCESSING', 'QUEUED'].includes(providerStatus)
+      ) {
         await this.handleProviderEvent(proposalId, 'DISPATCH_FAILED', {
           errorCode: 'PROVIDER_UNKNOWN_STATUS',
           errorMessage: `Unsupported provider status: ${providerStatus}`,
@@ -649,23 +748,32 @@ export class MobilityApprovalService {
   ) {
     const base = this.configService.get<string>('PROVIDER_BASE_URL');
     const explicitUrl = this.configService.get<string>(
-      action === 'accept' ? 'PROVIDER_ACCEPT_DRIVER_URL' : 'PROVIDER_REJECT_DRIVER_URL',
+      action === 'accept'
+        ? 'PROVIDER_ACCEPT_DRIVER_URL'
+        : 'PROVIDER_REJECT_DRIVER_URL',
     );
 
-    const url = explicitUrl ?? (base ? `${base.replace(/\/$/, '')}/driver/${action}` : null);
+    const url =
+      explicitUrl ??
+      (base ? `${base.replace(/\/$/, '')}/driver/${action}` : null);
     if (!url) {
       return;
     }
 
     // Local fallback bookings are managed fully in-app; do not call external provider.
-    if (typeof booking.providerBookingRef === 'string' && booking.providerBookingRef.startsWith('local-')) {
+    if (
+      typeof booking.providerBookingRef === 'string' &&
+      booking.providerBookingRef.startsWith('local-')
+    ) {
       return;
     }
 
     const token =
       this.configService.get<string>('PROVIDER_API_KEY') ??
       this.configService.get<string>('UBER_SERVER_TOKEN');
-    const timeoutMs = Number(this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000');
+    const timeoutMs = Number(
+      this.configService.get<string>('PROVIDER_TIMEOUT_MS') ?? '10000',
+    );
 
     try {
       await axios.post(
@@ -680,7 +788,8 @@ export class MobilityApprovalService {
           tripStatus: booking.tripStatus ?? null,
         },
         {
-          timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+          timeout:
+            Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
           headers: {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'Content-Type': 'application/json',
@@ -733,7 +842,9 @@ export class MobilityApprovalService {
       this.stringOrNull(driver.name) ??
       this.stringOrNull(driver.fullName) ??
       this.stringOrNull(driver.full_name) ??
-      (firstName || lastName ? `${firstName ?? ''} ${lastName ?? ''}`.trim() : null);
+      (firstName || lastName
+        ? `${firstName ?? ''} ${lastName ?? ''}`.trim()
+        : null);
 
     const tripStatus =
       this.stringOrNull(payload?.tripStatus) ??
@@ -831,11 +942,19 @@ export class MobilityApprovalService {
       to: proposal.to,
       status: proposal.status,
       provider: proposal.selectedProvider ?? proposal.best?.provider ?? null,
-      selectedProvider: proposal.selectedProvider ?? proposal.best?.provider ?? null,
+      selectedProvider:
+        proposal.selectedProvider ?? proposal.best?.provider ?? null,
       selectedPrice:
         proposal.selectedPrice ??
-        (proposal.best ? Number(((proposal.best.minPrice + proposal.best.maxPrice) / 2).toFixed(2)) : null),
-      selectedEtaMinutes: proposal.selectedEtaMinutes ?? proposal.best?.etaMinutes ?? null,
+        (proposal.best
+          ? Number(
+              ((proposal.best.minPrice + proposal.best.maxPrice) / 2).toFixed(
+                2,
+              ),
+            )
+          : null),
+      selectedEtaMinutes:
+        proposal.selectedEtaMinutes ?? proposal.best?.etaMinutes ?? null,
       pickupAt: proposal.pickupAt,
       expiresAt: proposal.expiresAt,
     };

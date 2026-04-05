@@ -12,7 +12,11 @@ class RulePreferences {
   maxEtaMinutes: number;
 }
 
-@Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
+@Schema({
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+})
 export class MobilityRule {
   @Prop({ required: true, index: true })
   userId: string;
