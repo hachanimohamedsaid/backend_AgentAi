@@ -102,10 +102,41 @@ export class DispatchSprintEmailsService {
         );
       }
       project = await this.projectModel.findOne({ row_number: rowNumber }).exec();
+
+      // Si le projet n'existe pas encore, on tente de le créer depuis la décision acceptée
+      if (!project) {
+        const decision = await this.projectDecisionsService.findLatestDecisionForRow(rowNumber);
+        if (decision && decision.action === 'accept') {
+          const techFromType = (decision.type_projet ?? '')
+            .split(/[,;]+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          project = await this.projectModel.findOneAndUpdate(
+            { row_number: rowNumber },
+            {
+              $set: {
+                title: decision.name,
+                description: decision.type_projet ?? '',
+                status: 'accepted',
+                row_number: rowNumber,
+                techStack: techFromType,
+                type_projet: decision.type_projet ?? null,
+                budget_estime: decision.budget_estime ?? null,
+                periode: decision.periode ?? null,
+                tags: techFromType,
+              },
+            },
+            { upsert: true, new: true },
+          ).exec();
+          this.logger.log(`[Dispatch] Projet row_number=${rowNumber} auto-créé depuis la décision acceptée.`);
+        }
+      }
     }
 
     if (!project) {
-      throw new NotFoundException(`Projet introuvable (projectId=${projectIdRaw}).`);
+      throw new NotFoundException(
+        `Projet introuvable (row_number=${projectIdRaw}). Aucune décision acceptée trouvée pour cette ligne.`,
+      );
     }
 
     // À partir d'ici on travaille toujours avec le vrai ObjectId MongoDB
