@@ -24,7 +24,6 @@ import { Sprint, SprintDocument } from '../pm/schemas/sprint.schema';
 import { Task, TaskDocument } from '../pm/schemas/task.schema';
 import {
   dispatchSprintEmailsBodySchema,
-  mongoObjectIdSchema,
   type DispatchSprintEmailsBody,
 } from './dispatch-sprint-emails.zod';
 
@@ -91,15 +90,26 @@ export class DispatchSprintEmailsService {
     projectIdRaw: string,
     bodyRaw: unknown,
   ): Promise<DispatchSprintEmailsResult> {
-    let projectId: string;
-    try {
-      projectId = mongoObjectIdSchema.parse(projectIdRaw);
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        throw new BadRequestException(e.flatten());
+    // Accepte un ObjectId MongoDB (24 hex) OU un row_number numérique (ex: "2" envoyé par n8n/Flutter)
+    let project: ProjectDocument | null = null;
+    if (Types.ObjectId.isValid(projectIdRaw) && /^[a-fA-F0-9]{24}$/.test(projectIdRaw)) {
+      project = await this.projectModel.findById(projectIdRaw).exec();
+    } else {
+      const rowNumber = parseInt(projectIdRaw, 10);
+      if (isNaN(rowNumber) || rowNumber < 1) {
+        throw new BadRequestException(
+          `projectId doit être un ObjectId MongoDB (24 hex) ou un row_number ≥ 1. Reçu: "${projectIdRaw}"`,
+        );
       }
-      throw e;
+      project = await this.projectModel.findOne({ row_number: rowNumber }).exec();
     }
+
+    if (!project) {
+      throw new NotFoundException(`Projet introuvable (projectId=${projectIdRaw}).`);
+    }
+
+    // À partir d'ici on travaille toujours avec le vrai ObjectId MongoDB
+    const projectId = String(project._id);
 
     let body: DispatchSprintEmailsBody;
     try {
@@ -114,11 +124,6 @@ export class DispatchSprintEmailsService {
     const autoAssign = body.autoAssignTasksByProfile ?? false;
     const ensureProposal = body.ensureSprintsFromAcceptedProposal ?? false;
     const useAiForAssignment = body.useAiForTaskAssignment !== false;
-
-    let project = await this.projectModel.findById(projectId).exec();
-    if (!project) {
-      throw new NotFoundException(`Projet introuvable (id=${projectId}).`);
-    }
 
     let sprintsCreated = 0;
     let tasksCreated = 0;
