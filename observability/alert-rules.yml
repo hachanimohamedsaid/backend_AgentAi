@@ -15,7 +15,7 @@ groups:
           (
             sum(rate(http_requests_total{job="nestjs-backend",status_code=~"5.."}[5m]))
             /
-            clamp_min(sum(rate(http_requests_total{job="nestjs-backend"}[5m])), 1e-9)
+            sum(rate(http_requests_total{job="nestjs-backend"}[5m]))
           ) > 0.05
         for: 5m
         labels:

@@ -145,22 +145,7 @@ Si `ML_SERVICE_URL` est défini (ou en local si le service ML tourne sur le port
 
 ## Observability locale (Prometheus, Loki, Grafana, Alertmanager)
 
-Guide detaille backend observability: [docs/BACKEND_OBSERVABILITY_GUIDE.md](docs/BACKEND_OBSERVABILITY_GUIDE.md)
-
 ### Démarrer la stack
-
-Option rapide (recommandée):
-
-```bash
-npm run obs:up
-```
-
-Cette commande:
-- démarre la stack observability,
-- vérifie les endpoints clés,
-- génère un petit trafic HTTP pour alimenter Grafana.
-
-Pour séparer frontend et backend dans Grafana, envoie aussi un header `x-client-source` depuis le client Flutter ou web, par exemple `flutter-mobile`, `web-admin` ou `internal-tools`.
 
 1. Démarrer le backend NestJS sur le port 3000:
 
@@ -190,19 +175,7 @@ curl -s http://localhost:3000/metrics | head -30
 curl -s http://localhost:9090/api/v1/targets | jq .
 ```
 
-Exemple de requête taggée côté client:
-
-```bash
-curl -H 'x-client-source: flutter-mobile' http://localhost:3000/
-```
-
 ### Arrêter la stack
-
-```bash
-npm run obs:down
-```
-
-ou:
 
 ```bash
 docker compose -f docker-compose.observability.yml down

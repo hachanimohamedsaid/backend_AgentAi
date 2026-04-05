@@ -10,33 +10,6 @@ import {
 
 type RequestWithId = Request & { requestId?: string };
 
-function normalizeRouteForMetrics(path: string, statusCode: number): string {
-  // Keep route cardinality low: all unknown routes (404) are grouped together.
-  if (statusCode === 404) {
-    return '/not-found';
-  }
-
-  return path || 'unknown';
-}
-
-function resolveRequestSource(req: Request): string {
-  const explicitSource = req.headers['x-client-source'];
-  if (typeof explicitSource === 'string' && explicitSource.trim().length > 0) {
-    return explicitSource.trim().toLowerCase();
-  }
-
-  const userAgent = String(req.headers['user-agent'] ?? '').toLowerCase();
-  if (userAgent.includes('flutter') || userAgent.includes('dart')) {
-    return 'flutter-unknown';
-  }
-
-  if (userAgent.includes('mozilla')) {
-    return 'web-unknown';
-  }
-
-  return 'unknown';
-}
-
 let defaultMetricsStarted = false;
 
 if (!defaultMetricsStarted) {
@@ -47,14 +20,14 @@ if (!defaultMetricsStarted) {
 export const httpRequestsTotal = new Counter({
   name: 'http_requests_total',
   help: 'Total HTTP requests by method, route, and status code',
-  labelNames: ['method', 'route', 'status_code', 'source'],
+  labelNames: ['method', 'route', 'status_code'],
   registers: [register],
 });
 
 export const httpRequestDurationSeconds = new Histogram({
   name: 'http_request_duration_seconds',
   help: 'HTTP request latency in seconds',
-  labelNames: ['method', 'route', 'status_code', 'source'],
+  labelNames: ['method', 'route', 'status_code'],
   buckets: [0.1, 0.5, 1, 2, 5, 10],
   registers: [register],
 });
@@ -91,18 +64,14 @@ export class PrometheusMiddleware implements NestMiddleware {
 
     res.on('finish', () => {
       const durationSeconds = Number(process.hrtime.bigint() - start) / 1_000_000_000;
-      const statusCodeNumber = res.statusCode;
-      const statusCode = String(statusCodeNumber);
-      const rawPath = req.route?.path ?? req.path;
-      const routePath = normalizeRouteForMetrics(rawPath, statusCodeNumber);
+      const statusCode = String(res.statusCode);
+      const routePath = req.route?.path ?? req.path;
       const method = req.method;
-      const source = resolveRequestSource(req);
 
       httpRequestsTotal.inc({
         method,
         route: routePath,
         status_code: statusCode,
-        source,
       });
 
       httpRequestDurationSeconds.observe(
@@ -110,14 +79,13 @@ export class PrometheusMiddleware implements NestMiddleware {
           method,
           route: routePath,
           status_code: statusCode,
-          source,
         },
         durationSeconds,
       );
 
       const requestId = req.requestId ?? 'unknown';
       console.log(
-        `[${requestId}] [${source}] ${method} ${rawPath} - ${statusCode} (${(durationSeconds * 1000).toFixed(2)}ms)`,
+        `[${requestId}] ${method} ${routePath} - ${statusCode} (${(durationSeconds * 1000).toFixed(2)}ms)`,
       );
     });
 
