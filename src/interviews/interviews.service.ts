@@ -21,6 +21,8 @@ import {
 } from './interview-gemini.service';
 import { GuestTokenPayload, GuestTokenService } from './guest-token.service';
 import { ProctoringEventDto } from './dto/proctor-events.dto';
+import { SendInviteEmailDto } from './dto/send-invite-email.dto';
+import { Resend } from 'resend';
 
 const DEFAULT_TTL_SEC = 60 * 60 * 24 * 7; // 7 jours
 
@@ -160,6 +162,72 @@ export class InterviewsService {
     ).replace(/\/+$/, '');
     const link = base ? `${base}?token=${token}` : `?token=${token}`;
     return { token, link };
+  }
+
+  /** Envoie l'e-mail d'invitation entretien au candidat via Resend. */
+  async sendInviteEmail(dto: SendInviteEmailDto): Promise<{ sent: boolean; messageId?: string }> {
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'RESEND_API_KEY non configurée sur le serveur — e-mail non envoyé.',
+      );
+    }
+
+    const from = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const candidate = dto.candidateName?.trim() || 'Candidat';
+    const job = dto.jobTitle?.trim() || 'ce poste';
+
+    const html = `
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+        <tr><td style="background:#0d1b2a;padding:28px 40px">
+          <h1 style="color:#fff;margin:0;font-size:22px">Ava — Invitation à un entretien</h1>
+        </td></tr>
+        <tr><td style="padding:36px 40px;color:#222">
+          <p style="font-size:16px;margin-top:0">Bonjour <strong>${candidate}</strong>,</p>
+          <p style="font-size:15px;line-height:1.6">
+            Vous êtes invité(e) à passer un entretien en ligne pour <strong>${job}</strong>.
+            L'entretien est conduit par notre assistant IA et prend environ 20 à 30 minutes.
+          </p>
+          <p style="font-size:15px;line-height:1.6">Cliquez sur le bouton ci-dessous pour commencer :</p>
+          <p style="text-align:center;margin:32px 0">
+            <a href="${dto.guestInterviewUrl}"
+               style="background:#00b4d8;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:bold;display:inline-block">
+              Démarrer l'entretien
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666;word-break:break-all">
+            Lien direct : <a href="${dto.guestInterviewUrl}" style="color:#00b4d8">${dto.guestInterviewUrl}</a>
+          </p>
+          ${dto.evaluationId ? `<p style="font-size:12px;color:#aaa;margin-bottom:0">Réf. évaluation : ${dto.evaluationId}</p>` : ''}
+        </td></tr>
+        <tr><td style="background:#f0f4f8;padding:16px 40px;font-size:12px;color:#999;text-align:center">
+          Ce lien est personnel et à usage unique. Ne le partagez pas.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+    const resend = new Resend(apiKey);
+    try {
+      const result = await resend.emails.send({
+        from,
+        to: dto.to,
+        subject: `Invitation à votre entretien — ${job}`,
+        html,
+      });
+      return { sent: true, messageId: result.data?.id };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(`Échec de l'envoi Resend : ${msg}`);
+    }
   }
 
   /** Retourne toutes les sessions liées à une evaluationId (guest + recruteur), triées par date. */

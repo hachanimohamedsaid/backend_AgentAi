@@ -15,6 +15,7 @@ import type { UserDocument } from '../users/schemas/user.schema';
 import { StartInterviewDto } from './dto/start-interview.dto';
 import { InterviewMessageDto } from './dto/interview-message.dto';
 import { GenerateInviteDto } from './dto/generate-invite.dto';
+import { SendInviteEmailDto } from './dto/send-invite-email.dto';
 import { InterviewsService } from './interviews.service';
 
 @Controller('interviews')
@@ -41,6 +42,17 @@ export class InterviewsController {
   @HttpCode(HttpStatus.OK)
   async generateInvite(@Body() dto: GenerateInviteDto) {
     return this.interviewsService.generateInvite(dto);
+  }
+
+  /**
+   * POST /interviews/send-invite-email
+   * Envoie l'e-mail d'invitation entretien au candidat via Resend.
+   * Body: { to, guestInterviewUrl, evaluationId?, candidateName?, jobTitle? }
+   */
+  @Post('send-invite-email')
+  @HttpCode(HttpStatus.OK)
+  async sendInviteEmail(@Body() dto: SendInviteEmailDto) {
+    return this.interviewsService.sendInviteEmail(dto);
   }
 
   /**
