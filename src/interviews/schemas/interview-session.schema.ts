@@ -11,8 +11,17 @@ export class InterviewSession {
   @Prop({ required: true, unique: true })
   sessionId: string;
 
-  @Prop({ type: Types.ObjectId, ref: User.name, required: true, index: true })
-  userId: Types.ObjectId;
+  /** null pour les sessions invité (guest) */
+  @Prop({ type: Types.ObjectId, ref: User.name, default: null, index: true, sparse: true })
+  userId: Types.ObjectId | null;
+
+  /** true si la session a été créée via un lien invité (sans JWT recruteur) */
+  @Prop({ type: Boolean, default: false, index: true })
+  isGuest: boolean;
+
+  /** evaluationId extrait du guest token — clé de vérification pour les appels invité */
+  @Prop({ type: String, default: null })
+  guestTokenSub: string | null;
 
   @Prop({ type: String })
   evaluationId?: string;
@@ -38,6 +47,32 @@ export class InterviewSession {
   })
   messages: Array<{ role: InterviewMessageRole; content: string; at: Date }>;
 
+  /**
+   * Événements de proctoring textuel envoyés par le client Flutter/web.
+   * Pas de flux vidéo — uniquement des signaux comportementaux.
+   */
+  @Prop({
+    type: [
+      {
+        type: { type: String, required: true },
+        ts: { type: Date, required: true },
+        clientEventId: { type: String, default: null },
+        durationMs: { type: Number, default: null },
+        count: { type: Number, default: null },
+        receivedAt: { type: Date, required: true },
+      },
+    ],
+    default: [],
+  })
+  proctoringEvents: Array<{
+    type: string;
+    ts: Date;
+    clientEventId: string | null;
+    durationMs: number | null;
+    count: number | null;
+    receivedAt: Date;
+  }>;
+
   @Prop({ type: String, default: null })
   summary: string | null;
 
@@ -52,3 +87,4 @@ export class InterviewSession {
 export const InterviewSessionSchema = SchemaFactory.createForClass(InterviewSession);
 
 InterviewSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+InterviewSessionSchema.index({ evaluationId: 1, createdAt: -1 });

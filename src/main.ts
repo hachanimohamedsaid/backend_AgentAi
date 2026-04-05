@@ -146,8 +146,7 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
-  const basePath = apiPrefix ? `/${apiPrefix}` : '';
-  console.log(`[App] NestJS server listening on port ${port} — préfixe HTTP: "${basePath || '/'}" (API_PATH_PREFIX=${apiPrefix || '(vide)'})`);
+  console.log(`[App] NestJS server listening on port ${port}`);
   console.log(`[App] Metrics endpoint available at http://localhost:${port}/metrics`);
   console.log(`[App] Health endpoint available at http://localhost:${port}/health`);
   console.log(`[App] Alert webhook endpoint available at http://localhost:${port}/alerts`);
