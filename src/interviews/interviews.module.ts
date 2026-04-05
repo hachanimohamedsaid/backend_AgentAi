@@ -8,6 +8,8 @@ import {
 import { InterviewGeminiService } from './interview-gemini.service';
 import { InterviewsService } from './interviews.service';
 import { InterviewsController } from './interviews.controller';
+import { InterviewsGuestController } from './interviews-guest.controller';
+import { GuestTokenService } from './guest-token.service';
 
 @Module({
   imports: [
@@ -16,7 +18,9 @@ import { InterviewsController } from './interviews.controller';
       { name: InterviewSession.name, schema: InterviewSessionSchema },
     ]),
   ],
-  controllers: [InterviewsController],
-  providers: [InterviewsService, InterviewGeminiService],
+  // InterviewsGuestController en premier pour que /interviews/guest/* soit résolu
+  // avant le pattern dynamique /interviews/:sessionId/* de InterviewsController
+  controllers: [InterviewsGuestController, InterviewsController],
+  providers: [InterviewsService, InterviewGeminiService, GuestTokenService],
 })
 export class InterviewsModule {}
