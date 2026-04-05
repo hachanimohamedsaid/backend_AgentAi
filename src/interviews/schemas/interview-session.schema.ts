@@ -47,6 +47,32 @@ export class InterviewSession {
   })
   messages: Array<{ role: InterviewMessageRole; content: string; at: Date }>;
 
+  /**
+   * Événements de proctoring textuel envoyés par le client Flutter/web.
+   * Pas de flux vidéo — uniquement des signaux comportementaux.
+   */
+  @Prop({
+    type: [
+      {
+        type: { type: String, required: true },
+        ts: { type: Date, required: true },
+        clientEventId: { type: String, default: null },
+        durationMs: { type: Number, default: null },
+        count: { type: Number, default: null },
+        receivedAt: { type: Date, required: true },
+      },
+    ],
+    default: [],
+  })
+  proctoringEvents: Array<{
+    type: string;
+    ts: Date;
+    clientEventId: string | null;
+    durationMs: number | null;
+    count: number | null;
+    receivedAt: Date;
+  }>;
+
   @Prop({ type: String, default: null })
   summary: string | null;
 

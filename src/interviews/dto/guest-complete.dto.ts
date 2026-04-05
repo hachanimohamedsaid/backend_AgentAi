@@ -1,7 +1,8 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class GuestCompleteDto {
+  /** Token signé invité — requis si absent du header Authorization: Bearer */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  token: string;
+  token?: string;
 }

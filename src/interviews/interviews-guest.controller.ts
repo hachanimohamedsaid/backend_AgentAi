@@ -1,6 +1,9 @@
 import {
   Body,
   Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -8,6 +11,7 @@ import {
 import { GuestStartDto } from './dto/guest-start.dto';
 import { GuestMessageDto } from './dto/guest-message.dto';
 import { GuestCompleteDto } from './dto/guest-complete.dto';
+import { ProctorEventsDto } from './dto/proctor-events.dto';
 import { GuestTokenService } from './guest-token.service';
 import { InterviewsService } from './interviews.service';
 
@@ -25,26 +29,34 @@ export class InterviewsGuestController {
 
   /**
    * POST /interviews/guest/start
-   * Body: { token: "<signed_guest_token>" }
+   * Headers: Authorization: Bearer <guest_token>  (ou body.token)
+   * Body: { token?: "..." }
    * Réponse: { sessionId, assistantMessage }
    */
   @Post('start')
-  async start(@Body() dto: GuestStartDto) {
-    const payload = this.guestTokenService.verify(dto.token);
+  async start(
+    @Body() dto: GuestStartDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    const token = this.interviewsService.extractGuestToken(authHeader, dto.token);
+    const payload = this.guestTokenService.verify(token);
     return this.interviewsService.startGuest(payload);
   }
 
   /**
    * POST /interviews/guest/:sessionId/message
-   * Body: { token: "...", content: "..." }
+   * Headers: Authorization: Bearer <guest_token>  (ou body.token)
+   * Body: { content: "...", token?: "..." }
    * Réponse: { assistantMessage }
    */
   @Post(':sessionId/message')
   async message(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Body() dto: GuestMessageDto,
+    @Headers('authorization') authHeader?: string,
   ) {
-    return this.interviewsService.postMessageGuest(sessionId, dto.token, dto.content);
+    const token = this.interviewsService.extractGuestToken(authHeader, dto.token);
+    return this.interviewsService.postMessageGuest(sessionId, token, dto.content);
   }
 
   /**
@@ -56,7 +68,30 @@ export class InterviewsGuestController {
   async complete(
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
     @Body() dto: GuestCompleteDto,
+    @Headers('authorization') authHeader?: string,
   ) {
-    return this.interviewsService.completeGuest(sessionId, dto.token);
+    const token = this.interviewsService.extractGuestToken(authHeader, dto.token);
+    return this.interviewsService.completeGuest(sessionId, token);
+  }
+
+  /**
+   * POST /interviews/guest/:sessionId/proctoring-events
+   * Headers: Authorization: Bearer <guest_token>  (ou body.token en fallback)
+   * Body: { events: [{ type, ts, clientEventId?, durationMs?, count? }], token? }
+   * Réponse: { accepted: N, deduplicated: M }
+   *
+   * Enregistre des événements de proctoring textuel (pas de flux vidéo).
+   * Types acceptés : honesty_attestation | session_proctoring_started |
+   *   face_absent | multiple_faces | visibility_hidden | app_backgrounded
+   */
+  @Post(':sessionId/proctoring-events')
+  @HttpCode(HttpStatus.OK)
+  async proctoringEvents(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @Body() dto: ProctorEventsDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    const token = this.interviewsService.extractGuestToken(authHeader, dto.token);
+    return this.interviewsService.appendProctoringEvents(sessionId, token, dto.events);
   }
 }

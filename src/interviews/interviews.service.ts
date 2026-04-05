@@ -20,6 +20,7 @@ import {
   InterviewGeminiService,
 } from './interview-gemini.service';
 import { GuestTokenPayload, GuestTokenService } from './guest-token.service';
+import { ProctoringEventDto } from './dto/proctor-events.dto';
 
 const DEFAULT_TTL_SEC = 60 * 60 * 24 * 7; // 7 jours
 
@@ -240,6 +241,66 @@ export class InterviewsService {
     await doc.save();
 
     return { assistantMessage };
+  }
+
+  /**
+   * Extrait le guest token depuis le header Authorization (Bearer) ou le body.
+   * Priorité : header > body.
+   */
+  extractGuestToken(authHeader: string | undefined, bodyToken: string | undefined): string {
+    if (authHeader?.startsWith('Bearer ')) {
+      return authHeader.slice(7).trim();
+    }
+    if (bodyToken?.trim()) return bodyToken.trim();
+    throw new BadRequestException(
+      'Token invité manquant : fournissez Authorization: Bearer <token> ou body.token.',
+    );
+  }
+
+  /**
+   * Enregistre des événements de proctoring textuel pour une session invité.
+   * Déduplique par clientEventId si fourni.
+   */
+  async appendProctoringEvents(
+    sessionId: string,
+    token: string,
+    events: ProctoringEventDto[],
+  ): Promise<{ accepted: number; deduplicated: number }> {
+    const payload = this.guestTokenService.verify(token);
+    const doc = await this.getSessionForGuest(sessionId, payload.sub);
+
+    const receivedAt = new Date();
+    const existingClientIds = new Set(
+      doc.proctoringEvents
+        .map((e) => e.clientEventId)
+        .filter((id): id is string => !!id),
+    );
+
+    let deduplicated = 0;
+    const toAppend: typeof doc.proctoringEvents = [];
+
+    for (const ev of events) {
+      if (ev.clientEventId && existingClientIds.has(ev.clientEventId)) {
+        deduplicated++;
+        continue;
+      }
+      toAppend.push({
+        type: ev.type,
+        ts: new Date(ev.ts),
+        clientEventId: ev.clientEventId ?? null,
+        durationMs: ev.durationMs ?? null,
+        count: ev.count ?? null,
+        receivedAt,
+      });
+      if (ev.clientEventId) existingClientIds.add(ev.clientEventId);
+    }
+
+    if (toAppend.length > 0) {
+      doc.proctoringEvents.push(...toAppend);
+      await doc.save();
+    }
+
+    return { accepted: toAppend.length, deduplicated };
   }
 
   async completeGuest(

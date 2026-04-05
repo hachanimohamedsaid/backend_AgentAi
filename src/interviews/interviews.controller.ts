@@ -59,6 +59,14 @@ export class InterviewsController {
       status: s.completedAt ? 'completed' : 'in_progress',
       summary: s.summary,
       transcript: s.messages.map((m) => ({ role: m.role, content: m.content, at: m.at })),
+      proctoringEvents: s.proctoringEvents.map((e) => ({
+        type: e.type,
+        ts: e.ts,
+        clientEventId: e.clientEventId,
+        durationMs: e.durationMs,
+        count: e.count,
+        receivedAt: e.receivedAt,
+      })),
       createdAt: (s as any).createdAt,
       completedAt: s.completedAt,
     }));
