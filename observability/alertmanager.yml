@@ -11,5 +11,5 @@ route:
 receivers:
   - name: default
     webhook_configs:
-      - url: http://host.docker.internal:5002/alerts
+      - url: http://host.docker.internal:3000/alerts
         send_resolved: true

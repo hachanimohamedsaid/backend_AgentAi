@@ -36,3 +36,49 @@ groups:
         annotations:
           summary: High API latency
           description: P95 latency is above 1s over the last 5 minutes.
+
+      - alert: HighMemoryRSS
+        expr: app_process_resident_memory_bytes{job="nestjs-backend"} > 800000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High backend memory usage
+          description: Resident memory is above 800MB for 10 minutes.
+
+      - alert: HighCPUUsage
+        expr: |
+          100 * (
+            sum(rate(process_cpu_user_seconds_total{job="nestjs-backend"}[5m]))
+            +
+            sum(rate(process_cpu_system_seconds_total{job="nestjs-backend"}[5m]))
+          ) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: High backend CPU usage
+          description: Estimated backend CPU usage is above 80% for 10 minutes.
+
+      - alert: NotFoundRouteSpike
+        expr: sum(rate(http_requests_total{job="nestjs-backend",route="/not-found"}[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Elevated not-found traffic
+          description: /not-found request rate is above 0.2 req/s for 10 minutes.
+
+      - alert: FrontendHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="nestjs-backend",source=~"flutter-.*",status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{job="nestjs-backend",source=~"flutter-.*"}[5m])), 0.000001)
+          ) > 0.03
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High frontend 5xx error rate
+          description: Flutter-sourced HTTP 5xx ratio is above 3% over the last 5 minutes.
