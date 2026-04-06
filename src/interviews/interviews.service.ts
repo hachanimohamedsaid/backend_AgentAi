@@ -154,6 +154,18 @@ export class InterviewsService {
     const candidate = dto.candidateName?.trim() || 'Candidat';
     const job = dto.jobTitle?.trim() || 'ce poste';
 
+    // ── Substitution localhost → URL publique ────────────────────────────────
+    // Si le front tourne en local (localhost / 127.0.0.1), remplace l'origine
+    // par FRONTEND_PUBLIC_URL (ou APP_PUBLIC_ORIGIN) pour que le lien soit
+    // cliquable depuis la boîte mail du candidat en production.
+    const publicOrigin = (
+      this.configService.get<string>('FRONTEND_PUBLIC_URL') ??
+      this.configService.get<string>('APP_PUBLIC_ORIGIN') ??
+      ''
+    ).replace(/\/+$/, '');
+
+    const guestUrl = this.resolvePublicUrl(dto.guestInterviewUrl, publicOrigin);
+
     const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
 <body style="font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0">
@@ -162,8 +174,8 @@ export class InterviewsService {
 <tr><td style="padding:36px 40px;color:#222">
   <p style="font-size:16px;margin-top:0">Bonjour <strong>${candidate}</strong>,</p>
   <p style="font-size:15px;line-height:1.6">Vous êtes invité(e) à passer un entretien en ligne pour <strong>${job}</strong>. L'entretien est conduit par notre assistant IA et prend environ 20 à 30 minutes.</p>
-  <p style="text-align:center;margin:32px 0"><a href="${dto.guestInterviewUrl}" style="background:#00b4d8;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:bold;display:inline-block">Démarrer l'entretien</a></p>
-  <p style="font-size:13px;color:#666;word-break:break-all">Lien direct : <a href="${dto.guestInterviewUrl}" style="color:#00b4d8">${dto.guestInterviewUrl}</a></p>
+  <p style="text-align:center;margin:32px 0"><a href="${guestUrl}" style="background:#00b4d8;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-size:16px;font-weight:bold;display:inline-block">Démarrer l'entretien</a></p>
+  <p style="font-size:13px;color:#666;word-break:break-all">Lien direct : <a href="${guestUrl}" style="color:#00b4d8">${guestUrl}</a></p>
   ${dto.evaluationId ? `<p style="font-size:12px;color:#aaa;margin-bottom:0">Réf. : ${dto.evaluationId}</p>` : ''}
 </td></tr>
 <tr><td style="background:#f0f4f8;padding:16px 40px;font-size:12px;color:#999;text-align:center">Ce lien est personnel. Ne le partagez pas.</td></tr>
@@ -171,11 +183,43 @@ export class InterviewsService {
 
     const resend = new Resend(apiKey);
     try {
-      const result = await resend.emails.send({ from, to: dto.to, subject: `Invitation à votre entretien — ${job}`, html });
+      const result = await resend.emails.send({
+        from,
+        to: dto.to,
+        subject: `Invitation à votre entretien — ${job}`,
+        html,
+      });
       return { sent: true, messageId: result.data?.id };
     } catch (err: unknown) {
-      throw new BadRequestException(`Échec envoi Resend : ${err instanceof Error ? err.message : String(err)}`);
+      throw new BadRequestException(
+        `Échec envoi Resend : ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
+  }
+
+  /**
+   * Remplace l'origine localhost / 127.0.0.1 de `rawUrl` par `publicOrigin`
+   * si une origine publique est configurée. Sinon retourne rawUrl tel quel.
+   */
+  private resolvePublicUrl(rawUrl: string, publicOrigin: string): string {
+    if (!publicOrigin) return rawUrl;
+    try {
+      const parsed = new URL(rawUrl);
+      const isLocal =
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1' ||
+        parsed.hostname.endsWith('.local');
+      if (isLocal) {
+        const pub = new URL(publicOrigin);
+        parsed.protocol = pub.protocol;
+        parsed.hostname = pub.hostname;
+        parsed.port = pub.port;
+        return parsed.toString();
+      }
+    } catch {
+      // URL malformée → on la retourne brute
+    }
+    return rawUrl;
   }
 
   // ─── Invité / Guest (GuestInterviewGuard) ────────────────────────────────
