@@ -146,7 +146,7 @@ export class InterviewsService {
     return this.sessionModel.find({ evaluationId }).sort({ createdAt: -1 }).exec();
   }
 
-  async sendInviteEmail(dto: SendInviteEmailDto): Promise<{ sent: boolean; messageId?: string }> {
+  async sendInviteEmail(dto: SendInviteEmailDto): Promise<{ sent: boolean; messageId?: string; guestUrl: string; urlWasRewritten: boolean }> {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!apiKey) throw new BadRequestException('RESEND_API_KEY non configurée sur le serveur.');
 
@@ -189,7 +189,14 @@ export class InterviewsService {
         subject: `Invitation à votre entretien — ${job}`,
         html,
       });
-      return { sent: true, messageId: result.data?.id };
+      return {
+        sent: true,
+        messageId: result.data?.id,
+        // URL réellement insérée dans le mail (peut différer de dto.guestInterviewUrl
+        // si le backend a remplacé localhost par FRONTEND_PUBLIC_URL)
+        guestUrl,
+        urlWasRewritten: guestUrl !== dto.guestInterviewUrl,
+      };
     } catch (err: unknown) {
       throw new BadRequestException(
         `Échec envoi Resend : ${err instanceof Error ? err.message : String(err)}`,
