@@ -1,8 +1,11 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class GuestStartDto {
-  /** Token signé invité — requis si absent du header Authorization: Bearer */
+  /**
+   * Si fourni, tente de reprendre la session existante.
+   * 403 si le sessionId appartient à un autre token invité.
+   */
   @IsOptional()
-  @IsString()
-  token?: string;
+  @IsUUID()
+  sessionId?: string;
 }
