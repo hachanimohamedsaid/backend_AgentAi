@@ -56,7 +56,7 @@ export interface DispatchSprintEmailsResult {
     filename?: string;
     dryRun?: boolean;
   }>;
-  failed: Array<{ employeeId?: string; email?: string; error: string }>;
+  failed: Array<{ employeeId?: string; email?: string; reason: string; error: string }>;
   skippedUnassignedTaskCount: number;
   unassignedTasks: Array<{ taskId: string; sprintId: string }>;
   assignedCount: number;
@@ -251,19 +251,19 @@ export class DispatchSprintEmailsService {
 
     for (const [employeeId, empTasks] of byEmployee.entries()) {
       if (!Types.ObjectId.isValid(employeeId)) {
-        failed.push({ employeeId, error: 'Identifiant employé invalide' });
+        failed.push({ employeeId, reason: 'Identifiant employé invalide', error: 'Identifiant employé invalide' });
         continue;
       }
 
       const employee = await this.employeeModel.findById(employeeId).exec();
       if (!employee) {
-        failed.push({ employeeId, error: 'Employé introuvable' });
+        failed.push({ employeeId, reason: 'Employé introuvable', error: 'Employé introuvable' });
         continue;
       }
 
       const email = (employee.email ?? '').trim();
       if (!email) {
-        failed.push({ employeeId, error: 'Email employé vide' });
+        failed.push({ employeeId, reason: 'Email employé vide', error: 'Email employé vide' });
         continue;
       }
 
@@ -361,7 +361,7 @@ export class DispatchSprintEmailsService {
       } catch (err: unknown) {
         const msg =
           err instanceof Error ? err.message : 'Envoi email échoué';
-        failed.push({ employeeId: String(employee._id), email, error: msg });
+        failed.push({ employeeId: String(employee._id), email, reason: msg, error: msg });
       }
     }
 
