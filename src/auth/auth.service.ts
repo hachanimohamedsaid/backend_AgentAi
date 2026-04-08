@@ -129,6 +129,7 @@ export class AuthService {
     return {
       user: this.toUserPayload(user),
       accessToken,
+      token: accessToken,
     };
   }
 

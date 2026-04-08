@@ -85,12 +85,16 @@ export class RhService {
     }
 
     // Return doc without password field
-    const raw = created.toObject();
-    const { password: _pw, ...userWithoutPassword } = raw as Record<string, unknown> & {
-      password?: string;
-    };
+    const raw: any = created.toObject();
+    delete raw.password;
+    delete raw.googleId;
+    delete raw.appleId;
+    delete raw.resetPasswordToken;
+    delete raw.emailVerificationToken;
+    delete raw.googleAccessToken;
+    delete raw.googleRefreshToken;
 
-    return { user: userWithoutPassword, emailSent };
+    return { user: raw, emailSent };
   }
 
   async update(id: string, body: UpdateEmployeeDto): Promise<UserDocument> {
