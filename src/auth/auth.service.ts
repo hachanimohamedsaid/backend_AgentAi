@@ -27,8 +27,16 @@ const RESET_TOKEN_EXPIRY_HOURS = 1;
 const VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
 
 export interface AuthResponse {
-  user: { id: string; name: string; email: string };
+  user: {
+    id: string;
+    _id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    employeeType: string | null;
+  };
   accessToken: string;
+  token: string;
 }
 
 @Injectable()
@@ -69,12 +77,22 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  private toUserPayload(doc: UserDocument): { id: string; name: string; email: string } {
+  private toUserPayload(doc: UserDocument): {
+    id: string;
+    _id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    employeeType: string | null;
+  } {
     const id = (doc as any)._id?.toString?.() ?? '';
     return {
       id,
+      _id: id,
       name: doc.name ?? '',
       email: doc.email ?? '',
+      role: (doc as any).role ?? null,
+      employeeType: (doc as any).employeeType ?? null,
     };
   }
 
@@ -196,11 +214,11 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user || !user.password) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
     const match = await bcrypt.compare(dto.password, user.password);
     if (!match) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
     const accessToken = await this.signToken({
       sub: (user as any)._id.toString(),
@@ -209,6 +227,7 @@ export class AuthService {
     return {
       user: this.toUserPayload(user),
       accessToken,
+      token: accessToken,
     };
   }
 
@@ -352,6 +371,7 @@ export class AuthService {
     return {
       user: this.toUserPayload(user),
       accessToken,
+      token: accessToken,
     };
   }
 
@@ -438,6 +458,7 @@ export class AuthService {
       return {
         user: this.toUserPayload(user),
         accessToken,
+        token: accessToken,
       };
     } catch (e) {
       this.logger.warn('Apple auth verify failed');

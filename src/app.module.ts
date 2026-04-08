@@ -26,6 +26,7 @@ import { RequestIdMiddleware } from './observability/request-id.middleware';
 import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
 import { ProjectDispatchModule } from './project-dispatch/project-dispatch.module';
+import { RhModule } from './rh/rh.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ProjectDispatchModule } from './project-dispatch/project-dispatch.modul
     RewardsModule,
     GoogleConnectModule,
     ProjectDispatchModule,
+    RhModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggerService],

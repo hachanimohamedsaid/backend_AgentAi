@@ -29,6 +29,20 @@ export class User {
   @Prop({ type: String, default: null })
   role: string | null;
 
+  // ── AVA Management (RH / Employee) ────────────────────────────────────────
+  @Prop({ type: String, default: null })
+  employeeType: string | null;
+
+  @Prop({ type: String, default: null })
+  department: string | null;
+
+  @Prop({ type: String, enum: ['active', 'leave', 'sick'], default: 'active' })
+  status: string;
+
+  @Prop({ type: Date, default: null })
+  joinDate: Date | null;
+  // ──────────────────────────────────────────────────────────────────────────
+
   @Prop({ type: String, default: null })
   location: string | null;
 
