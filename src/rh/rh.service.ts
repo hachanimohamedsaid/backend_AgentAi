@@ -52,7 +52,11 @@ export class RhService {
   // ── CRUD ─────────────────────────────────────────────────────────────────
 
   async findAll(): Promise<UserDocument[]> {
-    return this.userModel.find({}).select(EXCLUDED_FIELDS).lean() as any;
+    return this.userModel
+      .find({})
+      .select(EXCLUDED_FIELDS)
+      .sort({ createdAt: -1 })
+      .lean() as any;
   }
 
   async create(body: CreateEmployeeDto): Promise<{ user: any; emailSent: boolean }> {
@@ -72,16 +76,19 @@ export class RhService {
 
     // Send welcome email — failure must never block the response
     let emailSent = false;
+    console.log('[RH] Attempting to send welcome email to:', body.email);
     try {
       await this.mailService.sendDispatchEmail({
-        to: created.email,
+        to: body.email,
         subject: 'Bienvenue sur AVA Management — Vos accès',
         html: this.buildWelcomeHtml(created.name, created.email, tempPassword),
       });
       emailSent = true;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`[RH] Welcome email failed for ${created.email}: ${msg}`);
+      console.log('[RH] Welcome email sent successfully to:', body.email);
+    } catch (err) {
+      emailSent = false;
+      console.error('[RH] Email send failed:', err);
+      this.logger.error(`[RH] Email send failed for ${body.email}`, err);
     }
 
     // Return doc without password field
