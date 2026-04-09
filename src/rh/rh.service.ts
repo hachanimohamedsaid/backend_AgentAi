@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -60,6 +60,11 @@ export class RhService {
   }
 
   async create(body: CreateEmployeeDto): Promise<{ user: any; emailSent: boolean }> {
+    const existing = await this.userModel.findOne({ email: body.email }).exec();
+    if (existing) {
+      throw new ConflictException('Un employé avec cet email existe déjà');
+    }
+
     const tempPassword = this.generateTempPassword();
     const hashed = await bcrypt.hash(tempPassword, 10);
 
