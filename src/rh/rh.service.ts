@@ -66,10 +66,13 @@ export class RhService {
 
   async findAll(): Promise<UserDocument[]> {
     return this.userModel
-      .find({ role: { $exists: true, $nin: [null, ''] } })
-      .select(EXCLUDED_FIELDS)
-      .sort({ createdAt: -1 })
-      .lean() as any;
+      .find({
+        role: { $exists: true, $nin: [null, '', undefined] },
+      })
+      .select(
+        '-password -googleId -appleId -resetPasswordToken -emailVerificationToken -googleAccessToken -googleRefreshToken',
+      )
+      .lean();
   }
 
   async create(body: CreateEmployeeDto): Promise<{ user: any; emailSent: boolean }> {
@@ -174,6 +177,18 @@ export class RhService {
       .lean()
       .exec();
     if (!updated) throw new NotFoundException('Conge not found');
+
+    if (body.status === 'approved' || body.status === 'rejected') {
+      const employeeId = (updated as any).employeeId?.toString?.() ?? (updated as any).employeeId;
+      if (employeeId) {
+        const user = await this.userModel.findById(employeeId).exec();
+        if (user) {
+          (user as any).status = body.status === 'approved' ? 'leave' : 'active';
+          await user.save();
+        }
+      }
+    }
+
     return updated;
   }
 
@@ -230,6 +245,18 @@ export class RhService {
       .lean()
       .exec();
     if (!updated) throw new NotFoundException('Maladie not found');
+
+    if (body.status) {
+      const employeeId = (updated as any).employeeId?.toString?.() ?? (updated as any).employeeId;
+      if (employeeId) {
+        const user = await this.userModel.findById(employeeId).exec();
+        if (user) {
+          (user as any).status = body.status === 'resolved' ? 'active' : 'sick';
+          await user.save();
+        }
+      }
+    }
+
     return updated;
   }
 }
