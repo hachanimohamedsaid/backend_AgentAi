@@ -6,6 +6,15 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { MailService } from '../pm/mail/mail.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+import { Conge, CongeDocument } from './schemas/conge.schema';
+import { Reclamation, ReclamationDocument } from './schemas/reclamation.schema';
+import { Maladie, MaladieDocument } from './schemas/maladie.schema';
+import { CreateCongeDto } from './dto/create-conge.dto';
+import { UpdateCongeDto } from './dto/update-conge.dto';
+import { CreateReclamationDto } from './dto/create-reclamation.dto';
+import { UpdateReclamationDto } from './dto/update-reclamation.dto';
+import { CreateMaladieDto } from './dto/create-maladie.dto';
+import { UpdateMaladieDto } from './dto/update-maladie.dto';
 
 const EXCLUDED_FIELDS =
   '-password -googleId -appleId -resetPasswordToken -emailVerificationToken -googleAccessToken -googleRefreshToken';
@@ -17,6 +26,10 @@ export class RhService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly mailService: MailService,
+    @InjectModel(Conge.name) private readonly congeModel: Model<CongeDocument>,
+    @InjectModel(Reclamation.name)
+    private readonly reclamationModel: Model<ReclamationDocument>,
+    @InjectModel(Maladie.name) private readonly maladieModel: Model<MaladieDocument>,
   ) {}
 
   // ── helpers ──────────────────────────────────────────────────────────────
@@ -134,5 +147,89 @@ export class RhService {
       throw new NotFoundException('Employee not found');
     }
     return { deleted: true };
+  }
+
+  // ── Congés ───────────────────────────────────────────────────────────────
+
+  async listConges() {
+    return this.congeModel.find({}).sort({ createdAt: -1 }).lean().exec();
+  }
+
+  async createConge(body: CreateCongeDto) {
+    return this.congeModel.create({
+      employeeId: body.employeeId,
+      employeeName: body.employeeName,
+      type: body.type,
+      startDate: new Date(body.startDate),
+      endDate: new Date(body.endDate),
+      days: body.days,
+      reason: body.reason,
+      status: body.status ?? 'pending',
+    });
+  }
+
+  async updateConge(id: string, body: UpdateCongeDto) {
+    const updated = await this.congeModel
+      .findByIdAndUpdate(id, { $set: body }, { new: true })
+      .lean()
+      .exec();
+    if (!updated) throw new NotFoundException('Conge not found');
+    return updated;
+  }
+
+  // ── Réclamations ─────────────────────────────────────────────────────────
+
+  async listReclamations() {
+    return this.reclamationModel.find({}).sort({ createdAt: -1 }).lean().exec();
+  }
+
+  async createReclamation(body: CreateReclamationDto) {
+    return this.reclamationModel.create({
+      employeeId: body.employeeId,
+      employeeName: body.employeeName,
+      subject: body.subject,
+      category: body.category,
+      priority: body.priority ?? 'medium',
+      description: body.description,
+      status: body.status ?? 'open',
+    });
+  }
+
+  async updateReclamation(id: string, body: UpdateReclamationDto) {
+    const updated = await this.reclamationModel
+      .findByIdAndUpdate(id, { $set: body }, { new: true })
+      .lean()
+      .exec();
+    if (!updated) throw new NotFoundException('Reclamation not found');
+    return updated;
+  }
+
+  // ── Maladies ─────────────────────────────────────────────────────────────
+
+  async listMaladies() {
+    return this.maladieModel.find({}).sort({ createdAt: -1 }).lean().exec();
+  }
+
+  async createMaladie(body: CreateMaladieDto) {
+    return this.maladieModel.create({
+      employeeId: body.employeeId,
+      employeeName: body.employeeName,
+      startDate: new Date(body.startDate),
+      endDate: new Date(body.endDate),
+      days: body.days,
+      doctor: body.doctor,
+      description: body.description,
+      certificate: body.certificate ?? false,
+      status: body.status ?? 'active',
+    });
+  }
+
+  async updateMaladie(id: string, body: UpdateMaladieDto) {
+    const updated = await this.maladieModel
+      .findByIdAndUpdate(id, { $set: body }, { new: true })
+      .lean()
+      .exec();
+    if (!updated) throw new NotFoundException('Maladie not found');
+    return updated;
   }
 }
