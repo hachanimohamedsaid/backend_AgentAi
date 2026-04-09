@@ -53,7 +53,7 @@ export class RhService {
 
   async findAll(): Promise<UserDocument[]> {
     return this.userModel
-      .find({})
+      .find({ role: { $exists: true, $nin: [null, ''] } })
       .select(EXCLUDED_FIELDS)
       .sort({ createdAt: -1 })
       .lean() as any;
