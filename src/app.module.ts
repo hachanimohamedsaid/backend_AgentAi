@@ -23,6 +23,7 @@ import { ChallengesModule } from './challenges/challenges.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { GoogleConnectModule } from './google-connect/google-connect.module';
 import { WellbeingModule } from './wellbeing/wellbeing.module';
+import { EmployeesModule } from './employees/employees.module';
 import { RequestIdMiddleware } from './observability/request-id.middleware';
 import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
@@ -87,6 +88,7 @@ import { LoggerService } from './observability/logger.service';
     RewardsModule,
     GoogleConnectModule,
     WellbeingModule,
+    EmployeesModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggerService],
