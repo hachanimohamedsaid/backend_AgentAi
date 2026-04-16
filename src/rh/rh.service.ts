@@ -67,7 +67,8 @@ export class RhService {
   async findAll(): Promise<UserDocument[]> {
     return this.userModel
       .find({
-        role: { $exists: true, $nin: [null, '', undefined] },
+        // `$exists: true` already excludes `undefined`; keep TS/Mongoose typings happy.
+        role: { $exists: true, $nin: [null, ''] },
       })
       .select(
         '-password -googleId -appleId -resetPasswordToken -emailVerificationToken -googleAccessToken -googleRefreshToken',
