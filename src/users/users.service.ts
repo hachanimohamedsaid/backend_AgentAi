@@ -253,4 +253,16 @@ export class UsersService {
       googleSheetId: (user as any).googleSheetId ?? null,
     };
   }
+
+  async findAllGoogleConnected(): Promise<
+    Array<{ userId: string; googleEmail: string }>
+  > {
+    const users = await this.userModel
+      .find({ googleScopeGranted: true })
+      .exec();
+    return users.map((u) => ({
+      userId: (u as any)._id.toString(),
+      googleEmail: (u as any).googleConnectedEmail || u.email,
+    }));
+  }
 }

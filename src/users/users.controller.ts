@@ -97,6 +97,19 @@ export class UsersController {
   // ── N8N server-to-server endpoints (API key protected, no JWT) ────────────
 
   /**
+   * GET /users/google-connected
+   * N8N calls this to list users who granted Google scope.
+   * Protected by x-api-key header matching N8N_API_KEY env var.
+   */
+  @Get('google-connected')
+  async findAllGoogleConnected(
+    @Headers('x-api-key') apiKey: string,
+  ) {
+    this.checkApiKey(apiKey);
+    return this.usersService.findAllGoogleConnected();
+  }
+
+  /**
    * GET /users/:id/google-tokens
    * N8N calls this to get a valid Google access token for a user.
    * Protected by x-api-key header matching N8N_API_KEY env var.
