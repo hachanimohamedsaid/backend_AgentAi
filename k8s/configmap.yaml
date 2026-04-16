@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: pidevagentai
+data:
+  NODE_ENV: production
+  PORT: "3000"
+  PROMETHEUS_ENABLED: "true"
+  METRICS_PATH: /metrics
+  HEALTH_PATH: /health

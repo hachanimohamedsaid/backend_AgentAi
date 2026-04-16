@@ -23,7 +23,10 @@
     "verify:backend": "curl -sf http://localhost:3000/ || (echo 'Le backend Nest ne répond pas sur le port 3000. Lancez-le avec: npm run start:dev' && exit 1)",
     "verify:all": "npm run verify:env && npm run verify:ml && npm run verify:backend && echo '' && echo 'Tous les tests de vérification sont passés.'",
     "obs:up": "bash scripts/observability-up-check.sh",
-    "obs:down": "docker compose -f docker-compose.observability.yml down"
+    "obs:down": "docker compose -f docker-compose.observability.yml down",
+    "k8s:bootstrap": "bash scripts/k8s/bootstrap-kind.sh",
+    "k8s:deploy": "bash scripts/k8s/deploy-all.sh",
+    "k8s:test": "bash scripts/k8s/test-all.sh"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
