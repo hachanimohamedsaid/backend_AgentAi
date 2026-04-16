@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RhService } from './rh.service';
+import { RhRoleGuard } from './rh-role.guard';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { CreateCongeDto } from './dto/create-conge.dto';
@@ -20,7 +23,7 @@ import { CreateMaladieDto } from './dto/create-maladie.dto';
 import { UpdateMaladieDto } from './dto/update-maladie.dto';
 
 @Controller('rh')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RhRoleGuard)
 export class RhController {
   constructor(private readonly rhService: RhService) {}
 
@@ -30,6 +33,7 @@ export class RhController {
   }
 
   @Post('employees')
+  @HttpCode(HttpStatus.CREATED)
   addEmployee(@Body() body: CreateEmployeeDto) {
     return this.rhService.create(body);
   }

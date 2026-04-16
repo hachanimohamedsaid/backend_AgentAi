@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { MailService } from '../pm/mail/mail.service';
@@ -19,6 +20,18 @@ import { UpdateMaladieDto } from './dto/update-maladie.dto';
 const EXCLUDED_FIELDS =
   '-password -googleId -appleId -resetPasswordToken -emailVerificationToken -googleAccessToken -googleRefreshToken';
 
+export type EmployeeListItem = {
+  _id: string;
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  employeeType: string;
+  role: string;
+  status: string;
+  joinDate: Date | null;
+};
+
 @Injectable()
 export class RhService {
   private readonly logger = new Logger(RhService.name);
@@ -35,10 +48,12 @@ export class RhService {
   // ── helpers ──────────────────────────────────────────────────────────────
 
   private generateTempPassword(): string {
+    const length = 10 + crypto.randomInt(0, 3);
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const bytes = crypto.randomBytes(length);
     let out = '';
-    for (let i = 0; i < 8; i++) {
-      out += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < length; i++) {
+      out += chars[bytes[i]! % chars.length];
     }
     return out;
   }
@@ -62,21 +77,34 @@ export class RhService {
 </div>`;
   }
 
-  // ── CRUD ─────────────────────────────────────────────────────────────────
-
-  async findAll(): Promise<UserDocument[]> {
-    return this.userModel
-      .find({
-        // `$exists: true` already excludes `undefined`; keep TS/Mongoose typings happy.
-        role: { $exists: true, $nin: [null, ''] },
-      })
-      .select(
-        '-password -googleId -appleId -resetPasswordToken -emailVerificationToken -googleAccessToken -googleRefreshToken',
-      )
-      .lean();
+  private toEmployeeListItem(e: Record<string, unknown>): EmployeeListItem {
+    const id = String(e._id ?? e.id ?? '');
+    return {
+      _id: id,
+      id,
+      name: String(e.name ?? ''),
+      email: String(e.email ?? ''),
+      department: String(e.department ?? ''),
+      employeeType: String(e.employeeType ?? ''),
+      role: String(e.role ?? 'employee'),
+      status: String(e.status ?? 'active'),
+      joinDate: e.joinDate ? (e.joinDate as Date) : null,
+    };
   }
 
-  async create(body: CreateEmployeeDto): Promise<{ user: any; emailSent: boolean }> {
+  // ── CRUD ─────────────────────────────────────────────────────────────────
+
+  async findAll(): Promise<EmployeeListItem[]> {
+    const employees = await this.userModel
+      .find({})
+      .select(EXCLUDED_FIELDS)
+      .lean()
+      .exec();
+
+    return employees.map((e) => this.toEmployeeListItem(e as unknown as Record<string, unknown>));
+  }
+
+  async create(body: CreateEmployeeDto): Promise<Record<string, unknown>> {
     const existing = await this.userModel.findOne({ email: body.email }).exec();
     if (existing) {
       throw new ConflictException('Un employé avec cet email existe déjà');
@@ -85,16 +113,17 @@ export class RhService {
     const tempPassword = this.generateTempPassword();
     const hashed = await bcrypt.hash(tempPassword, 10);
 
-    const created = await this.userModel.create({
+    const created = (await (this.userModel as any).create({
       name: body.name,
       email: body.email.toLowerCase(),
       password: hashed,
+      mustChangePassword: true,
       department: body.department ?? null,
       employeeType: body.employeeType ?? null,
       role: body.role ?? 'employee',
       status: body.status ?? 'active',
       joinDate: body.joinDate ? new Date(body.joinDate) : null,
-    });
+    })) as UserDocument;
 
     // Send welcome email — failure must never block the response
     let emailSent = false;
@@ -113,8 +142,8 @@ export class RhService {
       this.logger.error(`[RH] Email send failed for ${body.email}`, err);
     }
 
-    // Return doc without password field
-    const raw: any = created.toObject();
+    const id = String(created._id);
+    const raw = created.toObject() as unknown as Record<string, unknown>;
     delete raw.password;
     delete raw.googleId;
     delete raw.appleId;
@@ -123,14 +152,22 @@ export class RhService {
     delete raw.googleAccessToken;
     delete raw.googleRefreshToken;
 
-    return { user: raw, emailSent };
+    return {
+      ...raw,
+      _id: id,
+      id,
+      temporaryPassword: tempPassword,
+      emailSent,
+      mustChangePassword: true,
+    };
   }
 
-  async update(id: string, body: UpdateEmployeeDto): Promise<UserDocument> {
-    const update: Record<string, unknown> = { ...body };
+  async update(id: string, body: UpdateEmployeeDto): Promise<EmployeeListItem> {
+    const { password: rawPassword, ...rest } = body;
+    const update: Record<string, unknown> = { ...rest };
 
-    if (body.password) {
-      update.password = await bcrypt.hash(body.password, 10);
+    if (rawPassword) {
+      update.password = await bcrypt.hash(rawPassword, 10);
     }
 
     const updated = await this.userModel
@@ -142,15 +179,15 @@ export class RhService {
       throw new NotFoundException('Employee not found');
     }
 
-    return updated as UserDocument;
+    return this.toEmployeeListItem(updated as unknown as Record<string, unknown>);
   }
 
-  async remove(id: string): Promise<{ deleted: true }> {
+  async remove(id: string): Promise<{ ok: true }> {
     const res = await this.userModel.findByIdAndDelete(id).exec();
     if (!res) {
       throw new NotFoundException('Employee not found');
     }
-    return { deleted: true };
+    return { ok: true };
   }
 
   // ── Congés ───────────────────────────────────────────────────────────────
