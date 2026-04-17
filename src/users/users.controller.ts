@@ -25,6 +25,12 @@ class SaveSheetIdDto {
   sheetId: string;
 }
 
+class SaveTelegramChatIdDto {
+  @IsString()
+  @IsNotEmpty()
+  chatId: string;
+}
+
 @Controller(['users', 'api/users'])
 export class UsersController {
   constructor(
@@ -107,6 +113,57 @@ export class UsersController {
   ) {
     this.checkApiKey(apiKey);
     return this.usersService.findAllGoogleConnected();
+  }
+
+  /**
+   * GET /users/by-telegram/:chatId
+   * N8N calls this to resolve a Telegram chat to a user + Google tokens/sheet.
+   * Protected by x-api-key header matching N8N_API_KEY env var.
+   */
+  @Get('by-telegram/:chatId')
+  async getByTelegramChatId(
+    @Param('chatId') chatId: string,
+    @Headers('x-api-key') apiKey: string,
+  ) {
+    this.checkApiKey(apiKey);
+    const user = await this.usersService.findByTelegramChatId(chatId);
+    if (!user) {
+      throw new NotFoundException({ error: 'User not found' });
+    }
+
+    try {
+      const tokens = await this.usersService.getValidGoogleAccessToken(
+        (user as any)._id?.toString?.() ?? (user as any)._id,
+      );
+      return {
+        userId: (user as any)._id.toString(),
+        googleSheetId: tokens.googleSheetId,
+        accessToken: tokens.accessToken,
+        googleConnectedEmail: tokens.googleEmail,
+      };
+    } catch (err: any) {
+      if (err instanceof NotFoundException) {
+        throw new NotFoundException({ error: 'Google account not connected' });
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * POST /users/:id/telegram-chat-id
+   * N8N calls this to attach a Telegram chatId to a user.
+   * Protected by x-api-key header matching N8N_API_KEY env var.
+   */
+  @Post(':id/telegram-chat-id')
+  @HttpCode(HttpStatus.OK)
+  async saveTelegramChatId(
+    @Param('id') id: string,
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: SaveTelegramChatIdDto,
+  ) {
+    this.checkApiKey(apiKey);
+    await this.usersService.saveTelegramChatId(id, body.chatId);
+    return { success: true };
   }
 
   /**

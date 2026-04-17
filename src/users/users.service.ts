@@ -265,4 +265,14 @@ export class UsersService {
       googleEmail: (u as any).googleConnectedEmail || u.email,
     }));
   }
+
+  async findByTelegramChatId(chatId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ telegramChatId: chatId }).exec();
+  }
+
+  async saveTelegramChatId(userId: string, chatId: string): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { telegramChatId: chatId })
+      .exec();
+  }
 }
