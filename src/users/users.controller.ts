@@ -31,6 +31,16 @@ class SaveTelegramChatIdDto {
   chatId: string;
 }
 
+class LinkTelegramDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @IsString()
+  @IsNotEmpty()
+  chatId: string;
+}
+
 @Controller(['users', 'api/users'])
 export class UsersController {
   constructor(
@@ -98,6 +108,45 @@ export class UsersController {
       badges: user.badges || [],
       championMonths: user.championMonths || [],
     };
+  }
+
+  @Post('telegram-link-token')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async generateTelegramLinkToken(@Request() req) {
+    const token = await this.usersService.generateTelegramLinkToken(req.user.id);
+    return { token };
+  }
+
+  @Post('link-telegram')
+  @HttpCode(HttpStatus.OK)
+  async linkTelegram(
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: LinkTelegramDto,
+  ) {
+    this.checkApiKey(apiKey);
+    const result = await this.usersService.linkTelegramByToken(
+      body.token,
+      body.chatId,
+    );
+    if (!result.success) {
+      throw new NotFoundException('Invalid or expired token');
+    }
+    return { success: true, userId: result.userId };
+  }
+
+  @Get('telegram-status')
+  @UseGuards(JwtAuthGuard)
+  async getTelegramStatus(@Request() req) {
+    return this.usersService.getTelegramStatus(req.user.id);
+  }
+
+  @Post('telegram-disconnect')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async disconnectTelegram(@Request() req) {
+    await this.usersService.disconnectTelegram(req.user.id);
+    return { success: true };
   }
 
   // ── N8N server-to-server endpoints (API key protected, no JWT) ────────────

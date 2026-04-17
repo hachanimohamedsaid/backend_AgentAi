@@ -116,6 +116,12 @@ export class User {
   @Prop({ type: String, default: null })
   telegramChatId: string | null;
 
+  @Prop({ type: String, default: null })
+  telegramLinkToken: string | null;
+
+  @Prop({ type: Date, default: null })
+  telegramLinkTokenExpiry: Date | null;
+
   createdAt?: Date;
   updatedAt?: Date;
 }

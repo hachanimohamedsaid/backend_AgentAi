@@ -295,4 +295,58 @@ export class UsersService {
       )
       .exec();
   }
+
+  async generateTelegramLinkToken(userId: string): Promise<string> {
+    const token =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        { telegramLinkToken: token, telegramLinkTokenExpiry: expiry },
+      )
+      .exec();
+    return token;
+  }
+
+  async linkTelegramByToken(
+    token: string,
+    chatId: string,
+  ): Promise<{ success: boolean; userId?: string }> {
+    const user = await this.userModel
+      .findOne({
+        telegramLinkToken: token,
+        telegramLinkTokenExpiry: { $gt: new Date() },
+      })
+      .exec();
+    if (!user) return { success: false };
+    const userId = (user as any)._id.toString();
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          telegramChatId: chatId,
+          telegramLinkToken: null,
+          telegramLinkTokenExpiry: null,
+        },
+      )
+      .exec();
+    return { success: true, userId };
+  }
+
+  async getTelegramStatus(
+    userId: string,
+  ): Promise<{ linked: boolean; chatId: string | null }> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) return { linked: false, chatId: null };
+    const chatId = (user as any).telegramChatId ?? null;
+    return { linked: !!chatId, chatId };
+  }
+
+  async disconnectTelegram(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne({ _id: userId }, { telegramChatId: null })
+      .exec();
+  }
 }
