@@ -118,16 +118,9 @@ export class GoogleConnectService {
       googleEmail,
     });
 
-    const userAfterSave = await this.usersService.findById(userId);
-    const existingSheetId = userAfterSave
-      ? String((userAfterSave as any).googleSheetId ?? '').trim()
-      : '';
-    if (existingSheetId !== '') {
-      console.log(
-        `[GoogleConnect] Sheet already exists for user ${userId} — skipping setup webhook`,
-      );
-      return { success: true, googleEmail };
-    }
+    // Always trigger sheet setup (even if a sheet existed before).
+    // Clear sheetId first so N8N stores a fresh one.
+    await this.usersService.clearGoogleSheetId(userId);
 
     // Trigger N8N setup-sheet webhook (fire-and-forget — don't fail if N8N is slow)
     const n8nBase =
@@ -147,6 +140,11 @@ export class GoogleConnectService {
     }
 
     return { success: true, googleEmail };
+  }
+
+  async disconnectGoogle(userId: string): Promise<{ success: true }> {
+    await this.usersService.disconnectGoogle(userId);
+    return { success: true };
   }
 
   async getStatus(userId: string): Promise<{

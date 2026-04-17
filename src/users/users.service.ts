@@ -275,4 +275,24 @@ export class UsersService {
       .updateOne({ _id: userId }, { telegramChatId: chatId })
       .exec();
   }
+
+  async clearGoogleSheetId(userId: string): Promise<void> {
+    await this.userModel.updateOne({ _id: userId }, { googleSheetId: null }).exec();
+  }
+
+  async disconnectGoogle(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          googleAccessToken: null,
+          googleRefreshToken: null,
+          googleTokenExpiry: null,
+          googleSheetId: null,
+          googleConnectedEmail: null,
+          googleScopeGranted: false,
+        },
+      )
+      .exec();
+  }
 }

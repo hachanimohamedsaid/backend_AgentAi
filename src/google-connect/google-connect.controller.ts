@@ -1,9 +1,12 @@
 import {
   Controller,
   Get,
+  Post,
   Query,
   Res,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -57,6 +60,16 @@ export class GoogleConnectController {
     } catch {
       res.redirect('piagent://google-connect/error');
     }
+  }
+
+  @Post('disconnect')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async disconnectGoogle(
+    @CurrentUser() user: UserDocument,
+  ): Promise<{ success: true }> {
+    const userId = (user as any)._id?.toString() ?? (user as any).id;
+    return this.googleConnectService.disconnectGoogle(userId);
   }
 
   private buildHtmlPage(status: 'success' | 'error', detail: string): string {
