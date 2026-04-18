@@ -43,5 +43,6 @@ import { DispatchSprintEmailsService } from './dispatch-sprint-emails.service';
     ProjectsService,
     ProposalPlanGeneratorService,
   ],
+  exports: [DispatchSprintEmailsService],
 })
 export class ProjectDispatchModule {}

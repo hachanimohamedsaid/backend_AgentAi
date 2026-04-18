@@ -22,6 +22,7 @@ import { SocialCampaignModule } from './social-campaign/social-campaign.module';
 import { ChallengesModule } from './challenges/challenges.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { GoogleConnectModule } from './google-connect/google-connect.module';
+import { InternalModule } from './internal/internal.module';
 import { RequestIdMiddleware } from './observability/request-id.middleware';
 import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
@@ -82,6 +83,7 @@ import { RhModule } from './rh/rh.module';
     ChallengesModule,
     RewardsModule,
     GoogleConnectModule,
+    InternalModule,
     ProjectDispatchModule,
     RhModule,
   ],

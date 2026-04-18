@@ -48,6 +48,7 @@ const FIXED_HTML_TEMPLATE = Handlebars.compile(`<h1>Vos missions — {{employee.
 
 export interface DispatchSprintEmailsResult {
   message: string;
+  projectId: string;
   sent: Array<{
     employeeId: string;
     email: string;
@@ -219,6 +220,7 @@ export class DispatchSprintEmailsService {
       return {
         message:
           'Aucun sprint pour ce projet. Utilisez ensureSprintsFromAcceptedProposal avec une proposition acceptée (row_number) ou créez des sprints manuellement.',
+        projectId: projectId,
         sent: [],
         reports: [],
         failed: [],
@@ -363,6 +365,7 @@ export class DispatchSprintEmailsService {
 
     return {
       message,
+      projectId: projectId,
       sent,
       reports,
       failed,
