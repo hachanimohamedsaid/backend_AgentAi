@@ -15,8 +15,6 @@ import {
   type TaskAssignmentLlmInput,
 } from '../ai/task-assignment-llm.service';
 import { ProjectDecisionsService } from '../project-decisions/project-decisions.service';
-import { MailService } from '../pm/mail/mail.service';
-import { PdfService } from '../pm/pdf/pdf.service';
 import { ProposalPlanGeneratorService } from '../pm/proposal-plan-generator.service';
 import { Employee, EmployeeDocument } from '../pm/schemas/employee.schema';
 import { Project, ProjectDocument } from '../pm/schemas/project.schema';
@@ -56,6 +54,22 @@ export interface DispatchSprintEmailsResult {
     filename?: string;
     dryRun?: boolean;
   }>;
+  reports: Array<{
+    employeeId: string;
+    employeeName: string;
+    email: string;
+    subject: string;
+    projectTitle: string;
+    sprintCount: number;
+    taskCount: number;
+    contentSource: 'gemini' | 'openai' | 'fixed_template';
+    llmModel?: string;
+    htmlBody: string;
+    pdfRequested: boolean;
+    pdfSuppressed: boolean;
+    suppressedPdfFilename?: string;
+    emailSuppressed: true;
+  }>;
   failed: Array<{ employeeId?: string; email?: string; reason: string; error: string }>;
   skippedUnassignedTaskCount: number;
   unassignedTasks: Array<{ taskId: string; sprintId: string }>;
@@ -80,8 +94,6 @@ export class DispatchSprintEmailsService {
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     private readonly dispatchLlm: DispatchEmailLlmService,
     private readonly taskAssignmentLlm: TaskAssignmentLlmService,
-    private readonly pdfService: PdfService,
-    private readonly mailService: MailService,
     private readonly projectDecisionsService: ProjectDecisionsService,
     private readonly proposalPlanGenerator: ProposalPlanGeneratorService,
   ) {}
@@ -208,6 +220,7 @@ export class DispatchSprintEmailsService {
         message:
           'Aucun sprint pour ce projet. Utilisez ensureSprintsFromAcceptedProposal avec une proposition acceptée (row_number) ou créez des sprints manuellement.',
         sent: [],
+        reports: [],
         failed: [],
         skippedUnassignedTaskCount: 0,
         unassignedTasks: [],
@@ -247,6 +260,7 @@ export class DispatchSprintEmailsService {
     }
 
     const sent: DispatchSprintEmailsResult['sent'] = [];
+    const reports: DispatchSprintEmailsResult['reports'] = [];
     const failed: DispatchSprintEmailsResult['failed'] = [];
 
     for (const [employeeId, empTasks] of byEmployee.entries()) {
@@ -294,9 +308,14 @@ export class DispatchSprintEmailsService {
       };
 
       let htmlBody: string;
+      let contentSource: 'gemini' | 'openai' | 'fixed_template' = 'fixed_template';
+      let llmModel: string | undefined;
       if (body.useLlmForEmailBody) {
         try {
-          htmlBody = await this.dispatchLlm.generateEmailHtml(payloadJson);
+          const report = await this.dispatchLlm.generateEmailReport(payloadJson);
+          htmlBody = report.html;
+          contentSource = report.provider;
+          llmModel = report.model;
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'LLM indisponible';
           this.logger.warn(`[DispatchSprintEmails] LLM indisponible, template fixe utilisé: ${msg}`);
@@ -306,68 +325,32 @@ export class DispatchSprintEmailsService {
         htmlBody = this.renderFixedTemplate(payloadJson);
       }
 
+      const subject = `Missions — ${project.title} (${employee.fullName})`;
       const safeName = employee.fullName.replace(/[^\w\s-]/g, '').trim() || 'employee';
       const filename = `missions-${project.title}-${safeName}.pdf`.replace(/\s+/g, '-');
-
-      let pdfBuffer: Buffer | undefined;
-      if (body.attachPdf && !body.dryRun) {
-        pdfBuffer = await this.pdfService.generateEmployeeDispatchPdf({
-          employee: {
-            fullName: employee.fullName,
-            email,
-            profile: employee.profile,
-          },
-          project: {
-            title: project.title,
-            description: project.description,
-            techStack: project.techStack ?? [],
-          },
-          sprintBlocks: sprintBlocks.map((b) => ({
-            sprint: {
-              title: b.sprint.title,
-              goal: b.sprint.goal,
-              startDate: b.sprint.startDate as Date,
-              endDate: b.sprint.endDate as Date,
-            },
-            tasks: b.tasks.map((tk) => ({
-              title: tk.title,
-              description: tk.description,
-              priority: tk.priority,
-              status: tk.status,
-              deliverable: tk.deliverable,
-            })),
-          })),
-        });
-      }
-
-      if (body.dryRun) {
-        sent.push({ employeeId: String(employee._id), email, dryRun: true });
-        continue;
-      }
-
-      try {
-        await this.mailService.sendDispatchEmail({
-          to: email,
-          subject: `Missions — ${project.title} (${employee.fullName})`,
-          html: htmlBody,
-          pdfBuffer,
-          filename: body.attachPdf ? filename : undefined,
-        });
-        sent.push({
-          employeeId: String(employee._id),
-          email,
-          filename: body.attachPdf ? filename : undefined,
-        });
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error ? err.message : 'Envoi email échoué';
-        failed.push({ employeeId: String(employee._id), email, reason: msg, error: msg });
-      }
+      reports.push({
+        employeeId: String(employee._id),
+        employeeName: employee.fullName,
+        email,
+        subject,
+        projectTitle: project.title,
+        sprintCount: sprintBlocks.length,
+        taskCount: empTasks.length,
+        contentSource,
+        llmModel,
+        htmlBody,
+        pdfRequested: body.attachPdf,
+        pdfSuppressed: body.attachPdf,
+        suppressedPdfFilename: body.attachPdf ? filename : undefined,
+        emailSuppressed: true,
+      });
     }
 
-    const emailsSent = sent.filter((s) => !s.dryRun).length;
+    const emailsSent = 0;
     const message = this.buildSummaryMessage({
-      emailsSent,
+      reportsGenerated: reports.length,
+      llmGeneratedCount: reports.filter((r) => r.contentSource !== 'fixed_template').length,
+      fixedTemplateCount: reports.filter((r) => r.contentSource === 'fixed_template').length,
       failed: failed.length,
       assignedCount,
       aiAssignedCount,
@@ -381,6 +364,7 @@ export class DispatchSprintEmailsService {
     return {
       message,
       sent,
+      reports,
       failed,
       skippedUnassignedTaskCount,
       unassignedTasks,
@@ -394,7 +378,9 @@ export class DispatchSprintEmailsService {
   }
 
   private buildSummaryMessage(p: {
-    emailsSent: number;
+    reportsGenerated: number;
+    llmGeneratedCount: number;
+    fixedTemplateCount: number;
     failed: number;
     assignedCount: number;
     aiAssignedCount?: number;
@@ -411,9 +397,9 @@ export class DispatchSprintEmailsService {
         ? ` (${p.aiAssignedCount} via IA, ${p.rulesAssignedCount} correspondance texte)`
         : '';
     if (p.dryRun) {
-      return `Simulation (dryRun) : ${p.emailsSent} envoi(s) prévu(s), ${p.failed} échec(s) simulé(s). Assignations auto : ${p.assignedCount}${assignDetail}. Sprints créés : ${p.sprintsCreated}, tâches créées : ${p.tasksCreated}. Tâches sans assigné : ${p.skippedUnassignedTaskCount}.`;
+      return `Simulation (dryRun) : ${p.reportsGenerated} rapport(s) préparé(s), ${p.failed} échec(s) simulé(s). Aucun e-mail envoyé et aucun PDF généré. Contenu LLM : ${p.llmGeneratedCount}, template fixe : ${p.fixedTemplateCount}. Assignations auto : ${p.assignedCount}${assignDetail}. Sprints créés : ${p.sprintsCreated}, tâches créées : ${p.tasksCreated}. Tâches sans assigné : ${p.skippedUnassignedTaskCount}.`;
     }
-    return `Envoi terminé : ${p.emailsSent} e-mail(s) envoyé(s), ${p.failed} échec(s). Assignations automatiques : ${p.assignedCount}${assignDetail}. Sprints générés : ${p.sprintsCreated}, tâches générées : ${p.tasksCreated}. Tâches encore sans assigné : ${p.skippedUnassignedTaskCount}.`;
+    return `Rapport généré : ${p.reportsGenerated} synthèse(s), ${p.failed} échec(s). Aucun e-mail envoyé et aucun PDF généré. Contenu LLM : ${p.llmGeneratedCount}, template fixe : ${p.fixedTemplateCount}. Assignations automatiques : ${p.assignedCount}${assignDetail}. Sprints générés : ${p.sprintsCreated}, tâches générées : ${p.tasksCreated}. Tâches encore sans assigné : ${p.skippedUnassignedTaskCount}.`;
   }
 
   private buildTaskAssignmentLlmPayload(
