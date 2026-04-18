@@ -37,24 +37,40 @@ export interface DispatchPayloadJson {
 const LLM_TIMEOUT_MS = 45_000;
 const MAX_OUTPUT_TOKENS = 2048;
 
+export type DispatchEmailProvider = 'gemini' | 'openai';
+
+export interface DispatchEmailGenerationResult {
+  html: string;
+  provider: DispatchEmailProvider;
+  model: string;
+}
+
 @Injectable()
 export class DispatchEmailLlmService {
   constructor(private readonly configService: ConfigService) {}
 
   async generateEmailHtml(payload: DispatchPayloadJson): Promise<string> {
+    const result = await this.generateEmailReport(payload);
+    return result.html;
+  }
+
+  async generateEmailReport(payload: DispatchPayloadJson): Promise<DispatchEmailGenerationResult> {
     const payloadStr = JSON.stringify(payload);
     const userPrompt = `Voici les données JSON : ${payloadStr}. Rédige l'e-mail pour ${payload.employee.email} en expliquant clairement ce que cette personne doit faire sprint par sprint.`;
 
     const geminiKey = this.configService.get<string>('GEMINI_API_KEY')
       ?? this.configService.get<string>('GOOGLE_GEMINI_API_KEY');
+    const geminiModel = this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
     if (geminiKey?.trim()) {
       try {
         const html = await this.withTimeout(
-          this.callGemini(geminiKey, userPrompt),
+          this.callGemini(geminiKey, geminiModel, userPrompt),
           LLM_TIMEOUT_MS,
           'Gemini timeout',
         );
-        if (html) return html;
+        if (html) {
+          return { html, provider: 'gemini', model: geminiModel };
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.warn('[DispatchEmailLlm] Gemini échoué, fallback OpenAI:', msg);
@@ -62,14 +78,17 @@ export class DispatchEmailLlmService {
     }
 
     const openaiKey = this.configService.get<string>('OPENAI_API_KEY');
+    const openaiModel = this.configService.get<string>('OPENAI_MODEL') ?? 'gpt-4o-mini';
     if (openaiKey?.trim() && !openaiKey.includes('your-openai')) {
       try {
         const html = await this.withTimeout(
-          this.callOpenAI(openaiKey, userPrompt),
+          this.callOpenAI(openaiKey, openaiModel, userPrompt),
           LLM_TIMEOUT_MS,
           'OpenAI timeout',
         );
-        if (html) return html;
+        if (html) {
+          return { html, provider: 'openai', model: openaiModel };
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.warn('[DispatchEmailLlm] OpenAI échoué:', msg);
@@ -79,8 +98,7 @@ export class DispatchEmailLlmService {
     throw new Error('LLM indisponible (Gemini et OpenAI).');
   }
 
-  private async callGemini(apiKey: string, userPrompt: string): Promise<string> {
-    const modelName = this.configService.get<string>('GEMINI_MODEL') ?? 'gemini-2.0-flash';
+  private async callGemini(apiKey: string, modelName: string, userPrompt: string): Promise<string> {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -98,10 +116,10 @@ export class DispatchEmailLlmService {
     return text;
   }
 
-  private async callOpenAI(apiKey: string, userPrompt: string): Promise<string> {
+  private async callOpenAI(apiKey: string, modelName: string, userPrompt: string): Promise<string> {
     const openai = new OpenAI({ apiKey, timeout: LLM_TIMEOUT_MS });
     const completion = await openai.chat.completions.create({
-      model: this.configService.get<string>('OPENAI_MODEL') ?? 'gpt-4o-mini',
+      model: modelName,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
