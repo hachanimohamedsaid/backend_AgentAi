@@ -41,7 +41,7 @@ export class InternalService {
       const sprint = sprints.find(
         s => String(s._id) === String(t.sprintId)
       );
-      let assignedEmployee = null;
+      let assignedEmployee: EmployeeDocument | null = null;
       if (t.assignedEmployeeId) {
         assignedEmployee = await this.employeeModel
           .findById(t.assignedEmployeeId).exec();
