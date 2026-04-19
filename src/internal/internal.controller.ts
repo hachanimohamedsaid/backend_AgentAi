@@ -25,6 +25,12 @@ export class InternalController {
     return this.internalService.getTask(id);
   }
 
+  @Get('tasks/:id/debug')
+  async debugTask(@Param('id') id: string) {
+    const task = await this.internalService.debugTask(id);
+    return task;
+  }
+
   @Get('employees/:id')
   getEmployee(@Param('id') id: string) {
     return this.internalService.getEmployee(id);

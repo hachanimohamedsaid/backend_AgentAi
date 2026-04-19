@@ -140,16 +140,47 @@ export class InternalService {
   }
 
   async assignTask(id: string, employeeId: string) {
-    const task = await this.taskModel.findById(id).exec();
-    if (!task) return { success: false, reason: 'task_not_found' };
-    if (task.assignedEmployeeId && task.status === 'assigned') {
-      return { success: false, reason: 'already_assigned' };
+    try {
+      const task = await this.taskModel.findById(id).exec();
+      if (!task) {
+        return { success: false, reason: 'task_not_found' };
+      }
+      if (task.assignedEmployeeId && task.status === 'assigned') {
+        return { success: false, reason: 'already_assigned' };
+      }
+      const updated = await this.taskModel
+        .findByIdAndUpdate(
+          id,
+          {
+            $set: {
+              assignedEmployeeId: employeeId,
+              status: 'assigned',
+            },
+          },
+          { new: true },
+        )
+        .exec();
+      return { success: true, task: updated };
+    } catch (err) {
+      return {
+        success: false,
+        reason: 'error',
+        error: String(err),
+      };
     }
-    await this.taskModel.findByIdAndUpdate(id, {
-      $set: { assignedEmployeeId: employeeId, status: 'assigned' }
-    }).exec();
-    const updated = await this.taskModel.findById(id).exec();
-    return { success: true, task: updated };
+  }
+
+  async debugTask(id: string) {
+    try {
+      const task = await this.taskModel.findById(id).exec();
+      return {
+        found: !!task,
+        id,
+        task: task ? task.toJSON() : null,
+      };
+    } catch (err) {
+      return { found: false, error: String(err) };
+    }
   }
 
   async rejectTask(id: string, employeeId: string) {
