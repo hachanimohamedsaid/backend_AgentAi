@@ -204,6 +204,13 @@ export class InternalService {
     return { success: true };
   }
 
+  async resetDispatch(id: string) {
+    await this.projectModel.findByIdAndUpdate(id, {
+      $set: { trelloDispatchDone: false }
+    }).exec();
+    return { success: true, message: 'Project reset, ready for dispatch again' };
+  }
+
   async dispatchProject(rowNumber: string, body: any) {
     const project = await this.projectModel.findOne({ 
       row_number: parseInt(rowNumber) 
