@@ -10,6 +10,11 @@ export class InternalController {
     return this.internalService.getAcceptedProjects();
   }
 
+  @Get('projects/all')
+  async getAllProjects() {
+    return this.internalService.getAllProjects();
+  }
+
   @Get('projects/:rowNumber/tasks')
   getProjectTasks(@Param('rowNumber') rowNumber: string) {
     return this.internalService.getProjectTasks(parseInt(rowNumber));

@@ -19,9 +19,16 @@ export class InternalService {
 
   async getAcceptedProjects() {
     const projects = await this.projectModel.find({
-      trelloDispatchDone: { $ne: true }
+      $or: [
+        { trelloDispatchDone: { $ne: true } },
+        { trelloDispatchDone: { $exists: false } }
+      ]
     }).sort({ updatedAt: -1 }).exec();
     return projects;
+  }
+
+  async getAllProjects() {
+    return this.projectModel.find().sort({ updatedAt: -1 }).exec();
   }
 
   async getProjectTasks(rowNumber: number) {
