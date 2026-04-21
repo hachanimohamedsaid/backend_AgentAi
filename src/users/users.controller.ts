@@ -237,6 +237,15 @@ export class UsersController {
     }
   }
 
+  @Get(':userId/calls')
+  async getCalls(
+    @Param('userId') userId: string,
+    @Headers('x-api-key') apiKey: string,
+  ) {
+    this.checkApiKey(apiKey);
+    return this.usersService.getCallsFromSheet(userId);
+  }
+
   /**
    * POST /users/:id/google-sheet-id
    * N8N calls this after creating the Google Sheet to store its ID.

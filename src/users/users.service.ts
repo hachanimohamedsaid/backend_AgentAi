@@ -254,6 +254,33 @@ export class UsersService {
     };
   }
 
+  async getCallsFromSheet(userId: string): Promise<any[]> {
+    const user = await this.userModel.findById(userId).lean();
+    if (!user || !user.googleSheetId) return [];
+
+    try {
+      const tokens = await this.getValidGoogleAccessToken(userId);
+      if (!tokens.accessToken || !tokens.googleSheetId) return [];
+
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${tokens.googleSheetId}/values/Calls`;
+      const res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${tokens.accessToken}` },
+      });
+      const rows: string[][] = res.data.values || [];
+      if (rows.length <= 1) return [];
+      const headers = rows[0];
+      return rows.slice(1).map((row) => {
+        const obj: Record<string, string> = {};
+        headers.forEach((h, i) => {
+          obj[h] = row[i] || '';
+        });
+        return obj;
+      });
+    } catch {
+      return [];
+    }
+  }
+
   async findAllGoogleConnected(): Promise<
     Array<{ userId: string; googleEmail: string }>
   > {
