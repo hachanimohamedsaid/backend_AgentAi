@@ -189,10 +189,15 @@ export class UsersService {
       .exec();
   }
 
+  async saveRagFolderId(userId: string, ragFolderId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, { ragFolderId });
+  }
+
   async getValidGoogleAccessToken(userId: string): Promise<{
     accessToken: string;
     googleEmail: string;
     googleSheetId: string | null;
+    ragFolderId: string | null;
   }> {
     const user = await this.userModel.findById(userId).exec();
     if (!user || !(user as any).googleRefreshToken) {
@@ -207,6 +212,7 @@ export class UsersService {
         accessToken: (user as any).googleAccessToken as string,
         googleEmail: (user as any).googleConnectedEmail as string,
         googleSheetId: (user as any).googleSheetId ?? null,
+        ragFolderId: (user as any).ragFolderId ?? null,
       };
     }
 
@@ -251,6 +257,7 @@ export class UsersService {
       accessToken: refreshed.access_token,
       googleEmail: (user as any).googleConnectedEmail as string,
       googleSheetId: (user as any).googleSheetId ?? null,
+      ragFolderId: (user as any).ragFolderId ?? null,
     };
   }
 
