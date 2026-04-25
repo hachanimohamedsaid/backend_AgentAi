@@ -1,9 +1,9 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { KeycloakAuthGuard } from '../auth/keycloak-auth.guard';
 import { ChallengesService } from './challenges.service';
 
 @Controller(['challenges', 'api/challenges'])
-@UseGuards(JwtAuthGuard)
+@UseGuards(KeycloakAuthGuard)
 export class ChallengesController {
   constructor(private readonly challengesService: ChallengesService) {}
 

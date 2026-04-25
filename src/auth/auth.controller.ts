@@ -94,6 +94,23 @@ export class AuthController {
     };
   }
 
+
+  /** Endpoint d'impersonation: permet à un admin de se connecter temporairement en tant qu'un autre utilisateur */
+  @Post('impersonate/:userId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async impersonate(
+    @CurrentUser() admin: UserDocument,
+    @Body() body: any,
+    @Param('userId') userId: string,
+  ): Promise<{ token: string }> {
+    // Vérification admin
+    if (!admin || admin.role !== 'admin') {
+      return { token: null };
+    }
+    return this.authService.impersonateUser(admin, userId);
+  }
+
   @Post('google')
   @HttpCode(HttpStatus.OK)
   async loginWithGoogle(@Body() dto: GoogleAuthDto): Promise<AuthResponse> {

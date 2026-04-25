@@ -254,16 +254,17 @@ Après un `register` ou `login` réussi :
    - **shared_preferences** ou **flutter_secure_storage**.
 
 ```dart
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+final storage = FlutterSecureStorage();
 
 Future<void> saveToken(String token) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('accessToken', token);
+  await storage.write(key: 'accessToken', value: token);
 }
 
 Future<String?> getToken() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getString('accessToken');
+  return await storage.read(key: 'accessToken');
 }
 ```
 

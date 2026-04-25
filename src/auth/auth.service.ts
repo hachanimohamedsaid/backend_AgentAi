@@ -1,3 +1,29 @@
+  /**
+   * Permet à un admin de générer un token JWT pour un autre utilisateur (impersonation)
+   */
+  async impersonateUser(admin: UserDocument, targetUserId: string): Promise<{ token: string }> {
+    // Vérifier que l'utilisateur courant est admin
+    if (!admin || admin.role !== 'admin') {
+      throw new UnauthorizedException('Only admins can impersonate users');
+    }
+    // Vérifier que l'utilisateur cible existe
+    const user = await this.usersService.findById(targetUserId);
+    if (!user) {
+      throw new BadRequestException('User to impersonate not found');
+    }
+    // Générer un JWT pour l'utilisateur cible, avec info d'impersonation
+    const payload = {
+      sub: (user as any)._id.toString(),
+      email: user.email,
+      role: user.role,
+      impersonatedBy: (admin as any)._id?.toString?.() ?? admin.id ?? null,
+    };
+    const token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+    // Logger l'action d'impersonation (audit log simple)
+    this.logger.log(`[IMPERSONATE] Admin ${admin.email} (${admin._id}) impersonated user ${user.email} (${user._id}) at ${new Date().toISOString()}`);
+    // TODO: Enregistrer dans une vraie table d'audit si besoin
+    return { token };
+  }
 import {
   ConflictException,
   Injectable,

@@ -28,9 +28,11 @@ import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
 import { ProjectDispatchModule } from './project-dispatch/project-dispatch.module';
 import { RhModule } from './rh/rh.module';
+import { KeycloakProviderModule } from './auth/keycloak-provider.module';
 
 @Module({
   imports: [
+    KeycloakProviderModule,
     // Load .env from project root; works locally and on Railway (env vars override)
     ConfigModule.forRoot({
       isGlobal: true,

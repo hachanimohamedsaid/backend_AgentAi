@@ -32,6 +32,7 @@ async function bootstrap() {
   }
 
   console.log('[App] Bootstrap starting...');
+
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
   app.useGlobalPipes(
@@ -41,6 +42,25 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Ajout Helmet pour la protection des headers
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const helmet = require('helmet');
+  app.use(helmet());
+
+  // Ajout express-rate-limit pour limiter le spam
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const rateLimit = require('express-rate-limit');
+  app.use(
+    rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100, // Limite chaque IP à 100 requêtes par fenêtre
+      standardHeaders: true,
+      legacyHeaders: false,
+    })
+  );
+
+  // CORS (déjà présent)
   app.enableCors({
     origin: true,
     credentials: true,
