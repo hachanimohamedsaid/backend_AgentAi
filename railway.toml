@@ -1,8 +1,9 @@
-# Railway – build & start (optionnel, les défauts conviennent si "start" = node dist/main)
+# Railway config aligned with Dockerfile deployment.
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "node dist/main.js"
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 10
