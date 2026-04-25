@@ -5,6 +5,8 @@ import {
   BadRequestException,
   ServiceUnavailableException,
   Logger,
+  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -493,32 +495,62 @@ export class AuthService {
   async impersonateUser(
     admin: UserDocument,
     targetUserId: string,
-  ): Promise<{ token: string }> {
+    context?: { ip?: string; userAgent?: string | null },
+  ): Promise<{
+    token: string;
+    user: {
+      _id: string;
+      name: string;
+      email: string;
+      role: string | null;
+      status: string;
+    };
+  }> {
     if (!admin || (admin as any).role !== 'admin') {
-      throw new UnauthorizedException('Only admins can impersonate users');
+      throw new ForbiddenException('Only admin can impersonate');
     }
 
     const user = await this.usersService.findById(targetUserId);
     if (!user) {
-      throw new BadRequestException('User to impersonate not found');
+      throw new NotFoundException('Target user not found');
+    }
+
+    if ((user as any).role === 'admin') {
+      throw new ConflictException('Impersonation forbidden for this target user');
+    }
+
+    if ((user as any).status !== 'active') {
+      throw new ConflictException('Impersonation allowed only for active users');
     }
 
     const payload = {
       sub: (user as any)._id.toString(),
       email: user.email,
       role: (user as any).role,
+      isImpersonation: true,
       impersonatedBy:
         (admin as any)._id?.toString?.() ?? (admin as any).id ?? null,
     };
 
-    const token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+    const expiresIn =
+      this.configService.get<string>('IMPERSONATION_JWT_EXPIRES_IN') ?? '30m';
+    const token = await this.jwtService.signAsync(payload, { expiresIn: expiresIn as any });
 
     this.logger.log(
-      `[IMPERSONATE] Admin ${admin.email} (${(admin as any)._id}) impersonated ` +
-      `user ${user.email} (${(user as any)._id}) at ${new Date().toISOString()}`,
+      `[AUDIT][IMPERSONATE] sourceAdmin=${admin.email}(${(admin as any)._id}) ` +
+      `targetUser=${user.email}(${(user as any)._id}) ip=${context?.ip ?? 'n/a'} ` +
+      `userAgent=${context?.userAgent ?? 'n/a'} at=${new Date().toISOString()}`,
     );
-    // TODO: Enregistrer dans une vraie table d'audit si besoin
 
-    return { token };
+    return {
+      token,
+      user: {
+        _id: (user as any)._id.toString(),
+        name: user.name,
+        email: user.email,
+        role: (user as any).role ?? null,
+        status: (user as any).status ?? 'active',
+      },
+    };
   }
 }
