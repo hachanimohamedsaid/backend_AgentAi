@@ -15,6 +15,10 @@ class ImpersonateDto {
   userId?: string;
   id?: string;
   targetUserId?: string;
+  target_id?: string;
+  selectedUserId?: string;
+  accountId?: string;
+  data?: Record<string, unknown>;
   user?: { id?: string; _id?: string } | string;
 }
 
@@ -46,8 +50,24 @@ export class ImpersonationController {
         ? dto.user
         : dto?.user?.id ?? dto?.user?._id ?? null;
 
+    const data = dto?.data ?? {};
+    const nestedFromData =
+      (typeof data['userId'] === 'string' && data['userId']) ||
+      (typeof data['targetUserId'] === 'string' && data['targetUserId']) ||
+      (typeof data['id'] === 'string' && data['id']) ||
+      (typeof data['_id'] === 'string' && data['_id']) ||
+      null;
+
     const candidate =
-      dto?.userId ?? dto?.targetUserId ?? dto?.id ?? nestedUserId ?? null;
+      dto?.userId ??
+      dto?.targetUserId ??
+      dto?.target_id ??
+      dto?.selectedUserId ??
+      dto?.accountId ??
+      dto?.id ??
+      nestedUserId ??
+      nestedFromData ??
+      null;
 
     if (typeof candidate !== 'string') {
       return null;
@@ -63,7 +83,7 @@ export class ImpersonationController {
     if (!targetUserId || !Types.ObjectId.isValid(targetUserId)) {
       throw new UnprocessableEntityException({
         message:
-          'A valid target user id is required (accepted: userId, targetUserId, id, user.id, user._id).',
+          'A valid target user id is required (accepted: userId, targetUserId, target_id, selectedUserId, accountId, id, user.id, user._id, data.userId).',
         code: 'INVALID_IMPERSONATION_PAYLOAD',
       });
     }
