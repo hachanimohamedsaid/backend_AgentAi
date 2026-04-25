@@ -113,6 +113,9 @@ export class User {
   @Prop({ type: Boolean, default: false })
   googleScopeGranted: boolean;
 
+  @Prop({ required: false })
+  ragFolderId?: string;
+
   @Prop({ type: String, default: null })
   telegramChatId: string | null;
 

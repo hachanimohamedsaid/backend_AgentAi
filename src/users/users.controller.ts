@@ -31,6 +31,12 @@ class SaveTelegramChatIdDto {
   chatId: string;
 }
 
+class SaveRagFolderIdDto {
+  @IsString()
+  @IsNotEmpty()
+  ragFolderId: string;
+}
+
 class LinkTelegramDto {
   @IsString()
   @IsNotEmpty()
@@ -237,6 +243,15 @@ export class UsersController {
     }
   }
 
+  @Get(':userId/calls')
+  async getCalls(
+    @Param('userId') userId: string,
+    @Headers('x-api-key') apiKey: string,
+  ) {
+    this.checkApiKey(apiKey);
+    return this.usersService.getCallsFromSheet(userId);
+  }
+
   /**
    * POST /users/:id/google-sheet-id
    * N8N calls this after creating the Google Sheet to store its ID.
@@ -251,6 +266,18 @@ export class UsersController {
   ) {
     this.checkApiKey(apiKey);
     await this.usersService.saveGoogleSheetId(id, body.sheetId);
+    return { success: true };
+  }
+
+  @Post(':userId/rag-folder-id')
+  @HttpCode(HttpStatus.OK)
+  async saveRagFolderId(
+    @Param('userId') userId: string,
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: SaveRagFolderIdDto,
+  ) {
+    this.checkApiKey(apiKey);
+    await this.usersService.saveRagFolderId(userId, body.ragFolderId);
     return { success: true };
   }
 

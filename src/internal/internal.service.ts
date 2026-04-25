@@ -20,12 +20,15 @@ export class InternalService {
   async getAcceptedProjects() {
     const projects = await this.projectModel.find({
       $or: [
-        { status: /^accepted$/i },
-        { status: /^accept$/i }
-      ],
-      trelloDispatchDone: { $ne: true }
+        { trelloDispatchDone: { $ne: true } },
+        { trelloDispatchDone: { $exists: false } }
+      ]
     }).sort({ updatedAt: -1 }).exec();
     return projects;
+  }
+
+  async getAllProjects() {
+    return this.projectModel.find().sort({ updatedAt: -1 }).exec();
   }
 
   async getProjectTasks(rowNumber: number) {
@@ -140,16 +143,47 @@ export class InternalService {
   }
 
   async assignTask(id: string, employeeId: string) {
-    const task = await this.taskModel.findById(id).exec();
-    if (!task) return { success: false, reason: 'task_not_found' };
-    if (task.assignedEmployeeId && task.status === 'assigned') {
-      return { success: false, reason: 'already_assigned' };
+    try {
+      const task = await this.taskModel.findById(id).exec();
+      if (!task) {
+        return { success: false, reason: 'task_not_found' };
+      }
+      if (task.assignedEmployeeId && task.status === 'assigned') {
+        return { success: false, reason: 'already_assigned' };
+      }
+      const updated = await this.taskModel
+        .findByIdAndUpdate(
+          id,
+          {
+            $set: {
+              assignedEmployeeId: employeeId,
+              status: 'assigned',
+            },
+          },
+          { new: true },
+        )
+        .exec();
+      return { success: true, task: updated };
+    } catch (err) {
+      return {
+        success: false,
+        reason: 'error',
+        error: String(err),
+      };
     }
-    await this.taskModel.findByIdAndUpdate(id, {
-      $set: { assignedEmployeeId: employeeId, status: 'assigned' }
-    }).exec();
-    const updated = await this.taskModel.findById(id).exec();
-    return { success: true, task: updated };
+  }
+
+  async debugTask(id: string) {
+    try {
+      const task = await this.taskModel.findById(id).exec();
+      return {
+        found: !!task,
+        id,
+        task: task ? task.toJSON() : null,
+      };
+    } catch (err) {
+      return { found: false, error: String(err) };
+    }
   }
 
   async rejectTask(id: string, employeeId: string) {
@@ -171,6 +205,13 @@ export class InternalService {
       $set: { trelloDispatchDone: true }
     }).exec();
     return { success: true };
+  }
+
+  async resetDispatch(id: string) {
+    await this.projectModel.findByIdAndUpdate(id, {
+      $set: { trelloDispatchDone: false }
+    }).exec();
+    return { success: true, message: 'Project reset, ready for dispatch again' };
   }
 
   async dispatchProject(rowNumber: string, body: any) {

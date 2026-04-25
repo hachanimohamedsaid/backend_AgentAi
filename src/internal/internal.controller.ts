@@ -10,6 +10,11 @@ export class InternalController {
     return this.internalService.getAcceptedProjects();
   }
 
+  @Get('projects/all')
+  async getAllProjects() {
+    return this.internalService.getAllProjects();
+  }
+
   @Get('projects/:rowNumber/tasks')
   getProjectTasks(@Param('rowNumber') rowNumber: string) {
     return this.internalService.getProjectTasks(parseInt(rowNumber));
@@ -23,6 +28,12 @@ export class InternalController {
   @Get('tasks/:id')
   getTask(@Param('id') id: string) {
     return this.internalService.getTask(id);
+  }
+
+  @Get('tasks/:id/debug')
+  async debugTask(@Param('id') id: string) {
+    const task = await this.internalService.debugTask(id);
+    return task;
   }
 
   @Get('employees/:id')
@@ -53,6 +64,11 @@ export class InternalController {
   @Patch('projects/:id/mark-dispatched')
   markDispatched(@Param('id') id: string) {
     return this.internalService.markDispatched(id);
+  }
+
+  @Patch('projects/:id/reset-dispatch')
+  async resetDispatch(@Param('id') id: string) {
+    return this.internalService.resetDispatch(id);
   }
 
   @Post('projects/:rowNumber/dispatch')
