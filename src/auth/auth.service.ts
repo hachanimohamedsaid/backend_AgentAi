@@ -507,7 +507,9 @@ export class AuthService {
     };
   }> {
     if (!admin || (admin as any).role !== 'admin') {
-      throw new ForbiddenException('Only admin can impersonate');
+      throw new ForbiddenException(
+        'Impersonation disponible uniquement avec un compte admin backend (pas un admin local).',
+      );
     }
 
     const user = await this.usersService.findById(targetUserId);
