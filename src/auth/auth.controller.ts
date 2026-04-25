@@ -1,233 +1,524 @@
 import {
-  Body,
-  Controller,
-  Get,
-  Patch,
-  Post,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  ServiceUnavailableException,
+  Logger,
 } from '@nestjs/common';
-import { AuthService, AuthResponse } from './auth.service';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
+import axios from 'axios';
+import * as jwt from 'jsonwebtoken';
+import jwksRsa from 'jwks-rsa';
+import { Resend } from 'resend';
+import { UsersService } from '../users/users.service';
+import { UserDocument } from '../users/schemas/user.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { SetNewPasswordDto } from './dto/set-new-password.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
-import { SendVerificationEmailDto } from './dto/send-verification-email.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { AppleAuthDto } from './dto/apple-auth.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CurrentUser } from './decorators/current-user.decorator';
-import type { UserDocument } from '../users/schemas/user.schema';
-import { UpdateProfileDto } from '../users/dto/update-profile.dto';
 
-@Controller('auth')
-export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+const SALT_ROUNDS = 10;
+const RESET_TOKEN_EXPIRY_HOURS = 1;
+const VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
 
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto): Promise<AuthResponse> {
-    return this.authService.register(dto);
-  }
-
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto): Promise<AuthResponse> {
-    return this.authService.login(dto);
-  }
-
-  /** Alias pour Flutter : même contrat que POST /auth/login */
-  @Post('signin')
-  @HttpCode(HttpStatus.OK)
-  async signin(@Body() dto: LoginDto): Promise<AuthResponse> {
-    return this.authService.login(dto);
-  }
-
-  @Post('reset-password')
-  @HttpCode(HttpStatus.OK)
-  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
-    await this.authService.resetPassword(dto.email);
-    return { message: 'If this email is registered, you will receive reset instructions.' };
-  }
-
-  /** Définir le nouveau mot de passe après clic sur le lien reçu par email (token dans le lien). */
-  @Post('reset-password/confirm')
-  @HttpCode(HttpStatus.OK)
-  async setNewPassword(@Body() dto: SetNewPasswordDto): Promise<{ message: string }> {
-    await this.authService.setNewPassword(dto.token, dto.newPassword);
-    return { message: 'Password has been reset. You can now sign in.' };
-  }
-
-  /** Envoi de l’email avec lien de vérification (utilisateur connecté, JWT requis). */
-  @Post('verify-email')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  async sendVerificationEmail(
-    @CurrentUser() user: UserDocument,
-  ): Promise<{ message: string }> {
-    const userId = (user as any)._id?.toString();
-    await this.authService.sendVerificationEmailForCurrentUser(userId);
-    return { message: 'If your email is not yet verified, you will receive a verification link.' };
-  }
-
-  /** Confirmation du token reçu par email (lien cliqué). Met emailVerified à true. */
-  @Post('verify-email/confirm')
-  @HttpCode(HttpStatus.OK)
-  async confirmEmailVerification(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
-    await this.authService.verifyEmail(dto.token);
-    return { message: 'Email verified successfully.' };
-  }
-
-  /** Renvoyer l’email de vérification par adresse (sans JWT). */
-  @Post('send-verification-email')
-  @HttpCode(HttpStatus.OK)
-  async sendVerificationEmailByEmail(
-    @Body() dto: SendVerificationEmailDto,
-  ): Promise<{ message: string }> {
-    await this.authService.sendVerificationEmail(dto.email);
-    return {
-      message:
-        'If this email is registered and not yet verified, you will receive a verification link.',
-    };
-  }
-
-
-  /** Endpoint d'impersonation: permet à un admin de se connecter temporairement en tant qu'un autre utilisateur */
-  @Post('impersonate/:userId')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  async impersonate(
-    @CurrentUser() admin: UserDocument,
-    @Body() body: any,
-    @Param('userId') userId: string,
-  ): Promise<{ token: string }> {
-    // Vérification admin
-    if (!admin || admin.role !== 'admin') {
-      return { token: null };
-    }
-    return this.authService.impersonateUser(admin, userId);
-  }
-
-  @Post('google')
-  @HttpCode(HttpStatus.OK)
-  async loginWithGoogle(@Body() dto: GoogleAuthDto): Promise<AuthResponse> {
-    return this.authService.loginWithGoogle(dto);
-  }
-
-  @Post('apple')
-  @HttpCode(HttpStatus.OK)
-  async loginWithApple(@Body() dto: AppleAuthDto): Promise<AuthResponse> {
-    return this.authService.loginWithApple(dto);
-  }
-
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async me(
-    @CurrentUser() user: UserDocument,
-  ): Promise<{
+export interface AuthResponse {
+  user: {
     id: string;
+    _id: string;
     name: string;
     email: string;
     role: string | null;
-    location: string | null;
-    phone: string | null;
-    birthDate: string | null;
-    bio: string | null;
-    avatarUrl: string | null;
-    createdAt: string | null;
-    conversationsCount: number;
-    daysActive: number;
-    hoursSaved: number;
-    emailVerified: boolean;
-    challengePoints: number;
-    completedChallenges: string[];
-    isPremium: boolean;
-    badges: string[];
-    championMonths: string[];
-  }> {
-    const obj = user.toJSON ? user.toJSON() : (user as any);
-    const id = obj.id ?? (user as any)._id?.toString();
-    const name = obj.name ?? user.name;
-    const email = obj.email ?? user.email;
-    const role = obj.role ?? (user as any).role ?? null;
-    const location = obj.location ?? (user as any).location ?? null;
-    const phone = obj.phone ?? (user as any).phone ?? null;
-    const birthDate = (user as any).birthDate ?? obj.birthDate ?? null;
-    const bio = obj.bio ?? (user as any).bio ?? null;
-    const avatarUrl = obj.avatarUrl ?? (user as any).avatarUrl ?? null;
-    const createdAt = user.createdAt ?? (user as any).createdAt;
-    const conversationsCount = obj.conversationsCount ?? (user as any).conversationsCount ?? 0;
-    const hoursSaved = obj.hoursSaved ?? (user as any).hoursSaved ?? 0;
-    const emailVerified = obj.emailVerified ?? (user as any).emailVerified ?? false;
-    const challengePoints = obj.challengePoints ?? (user as any).challengePoints ?? 0;
-    const completedChallenges =
-      obj.completedChallenges ?? (user as any).completedChallenges ?? [];
-    const isPremium = obj.isPremium ?? (user as any).isPremium ?? false;
-    const badges = obj.badges ?? (user as any).badges ?? [];
-    const championMonths = obj.championMonths ?? (user as any).championMonths ?? [];
-    const daysActive = createdAt
-      ? Math.max(
-          0,
-          Math.floor(
-            (Date.now() - new Date(createdAt).getTime()) / (24 * 60 * 60 * 1000),
-          ),
-        )
-      : 0;
+    employeeType: string | null;
+  };
+  accessToken: string;
+  token: string;
+}
 
+@Injectable()
+export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
+  private readonly appleJwks = jwksRsa({
+    jwksUri: 'https://appleid.apple.com/auth/keys',
+    cache: true,
+  });
+
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  private getGoogleAudiences(): string[] {
+    const legacyClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') ?? '';
+    const multiClientIdsRaw = this.configService.get<string>('GOOGLE_CLIENT_IDS') ?? '';
+    const values = [legacyClientId, ...multiClientIdsRaw.split(',')]
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return Array.from(new Set(values));
+  }
+
+  private getAppleAudiences(): string[] {
+    const legacyAudience = this.configService.get<string>('APPLE_CLIENT_ID') ?? '';
+    const iosAudience = this.configService.get<string>('APPLE_AUDIENCE_IOS') ?? '';
+    const multiAudiencesRaw = this.configService.get<string>('APPLE_AUDIENCES') ?? '';
+    const values = [legacyAudience, iosAudience, ...multiAudiencesRaw.split(',')]
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return Array.from(new Set(values));
+  }
+
+  private toUserPayload(doc: UserDocument): AuthResponse['user'] {
+    const id = (doc as any)._id?.toString?.() ?? '';
     return {
       id,
-      name,
-      email,
-      role,
-      location,
-      phone,
-      birthDate: birthDate ? new Date(birthDate).toISOString().slice(0, 10) : null,
-      bio,
-      avatarUrl,
-      createdAt: createdAt ? new Date(createdAt).toISOString() : null,
-      conversationsCount: Number(conversationsCount),
-      daysActive,
-      hoursSaved: Number(hoursSaved),
-      emailVerified: Boolean(emailVerified),
-      challengePoints: Number(challengePoints),
-      completedChallenges: Array.isArray(completedChallenges)
-        ? completedChallenges
-        : [],
-      isPremium: Boolean(isPremium),
-      badges: Array.isArray(badges) ? badges : [],
-      championMonths: Array.isArray(championMonths) ? championMonths : [],
+      _id: id,
+      name: doc.name ?? '',
+      email: doc.email ?? '',
+      role: (doc as any).role ?? null,
+      employeeType: (doc as any).employeeType ?? null,
     };
   }
 
-  /** Changer le mot de passe (utilisateur connecté). */
-  @Post('change-password')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  async changePassword(
-    @CurrentUser() user: UserDocument,
-    @Body() dto: ChangePasswordDto,
-  ): Promise<{ message: string }> {
-    const userId = (user as any)._id?.toString();
-    await this.authService.changePassword(
-      userId,
-      dto.currentPassword,
-      dto.newPassword,
-    );
-    return { message: 'Password updated successfully' };
+  private async signToken(payload: { sub: string; email: string }): Promise<string> {
+    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
+    return this.jwtService.signAsync(payload, { expiresIn: expiresIn as any });
   }
 
-  /** Mise à jour du profil (nom, rôle, localisation, stats). */
-  @Patch('me')
-  @UseGuards(JwtAuthGuard)
-  async updateMe(
-    @CurrentUser() user: UserDocument,
-    @Body() dto: UpdateProfileDto,
-  ): Promise<{ message: string }> {
-    const userId = (user as any)._id?.toString();
-    await this.authService.updateProfile(userId, dto);
-    return { message: 'Profile updated' };
+  private getAppleSigningKey = (
+    header: jwt.JwtHeader,
+    callback: jwt.SigningKeyCallback,
+  ) => {
+    if (!header.kid) return callback(new Error('No kid in header'));
+    this.appleJwks.getSigningKey(header.kid, (err, key) => {
+      if (err) return callback(err);
+      callback(null, key?.getPublicKey());
+    });
+  };
+
+  // ─── Registration & Email Verification ──────────────────────────────────────
+
+  async register(dto: RegisterDto): Promise<AuthResponse> {
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const user = await this.usersService.createUser({
+      name: dto.name.trim(),
+      email: dto.email.toLowerCase().trim(),
+      password: hashedPassword,
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
+
+    const accessToken = await this.signToken({
+      sub: (user as any)._id.toString(),
+      email: user.email,
+    });
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
+  }
+
+  private async sendVerificationEmailToUser(
+    user: UserDocument,
+    token: string,
+  ): Promise<void> {
+    const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!resendApiKey) {
+      this.logger.error('[Resend] RESEND_API_KEY is not set – verification email not sent');
+      throw new ServiceUnavailableException(
+        'Email service is not configured. Set RESEND_API_KEY on the server.',
+      );
+    }
+
+    const emailFrom =
+      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const verifyUrl =
+      this.configService.get<string>('FRONTEND_VERIFY_EMAIL_URL') ??
+      'https://yourapp.com/verify-email';
+    const link = `${verifyUrl.replace(/\/$/, '')}?token=${token}`;
+
+    try {
+      await new Resend(resendApiKey).emails.send({
+        from: emailFrom,
+        to: user.email,
+        subject: 'Verify your email address',
+        text: `Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h): ${link}`,
+        html: `<p>Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${link}">${link}</a></p>`,
+      });
+    } catch (err: any) {
+      this.logger.error('[Resend] Verification email failed:', err?.message, err?.response?.data);
+      throw new ServiceUnavailableException(
+        'Could not send verification email. Check your Resend domain and API key.',
+      );
+    }
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const user = await this.usersService.findByEmailVerificationToken(token);
+    if (!user) {
+      throw new BadRequestException('Invalid or expired verification token');
+    }
+    (user as any).emailVerified = true;
+    (user as any).emailVerificationToken = null;
+    (user as any).emailVerificationExpires = null;
+    await user.save();
+  }
+
+  /** POST /auth/verify-email — utilisateur connecté (JWT). */
+  async sendVerificationEmailForCurrentUser(userId: string): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user || (user as any).emailVerified) return;
+
+    const token = crypto.randomBytes(32).toString('hex');
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
+  }
+
+  /** POST /auth/send-verification-email — sans JWT. */
+  async sendVerificationEmail(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user || (user as any).emailVerified) return;
+
+    const token = crypto.randomBytes(32).toString('hex');
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
+      Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    await user.save();
+    await this.sendVerificationEmailToUser(user, token);
+  }
+
+  // ─── Login ───────────────────────────────────────────────────────────────────
+
+  async login(dto: LoginDto): Promise<AuthResponse> {
+    const user = await this.usersService.findByEmail(dto.email);
+    if (!user || !user.password) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
+    }
+
+    const match = await bcrypt.compare(dto.password, user.password);
+    if (!match) {
+      throw new UnauthorizedException('Email ou mot de passe incorrect');
+    }
+
+    const accessToken = await this.signToken({
+      sub: (user as any)._id.toString(),
+      email: user.email,
+    });
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
+  }
+
+  // ─── Password Reset ──────────────────────────────────────────────────────────
+
+  async resetPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) return; // silent — avoid leaking whether email exists
+
+    const token = crypto.randomBytes(32).toString('hex');
+    (user as any).resetPasswordToken = token;
+    (user as any).resetPasswordExpires = new Date(
+      Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+    await user.save();
+
+    const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
+    if (!resendApiKey) {
+      this.logger.error('[Resend] RESEND_API_KEY is not set – reset email not sent');
+      return;
+    }
+
+    const emailFrom =
+      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+    const frontendResetUrl =
+      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ??
+      'https://yourapp.com/reset-password/confirm';
+    const resetLink = `${frontendResetUrl.replace(/\/$/, '')}?token=${token}`;
+
+    try {
+      await new Resend(resendApiKey).emails.send({
+        from: emailFrom,
+        to: user.email,
+        subject: 'Reset your password',
+        text: `Reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
+        html: `<p>Reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+      });
+    } catch (err: any) {
+      this.logger.error('[Resend] Reset email failed:', err?.message, err?.response?.data);
+      // Don't throw — avoid leaking email existence
+    }
+  }
+
+  async setNewPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByResetToken(token);
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+    (user as any).password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    (user as any).resetPasswordToken = null;
+    (user as any).resetPasswordExpires = null;
+    await user.save();
+  }
+
+  // ─── Google OAuth ────────────────────────────────────────────────────────────
+
+  async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthResponse> {
+    if (!dto.idToken && !dto.accessToken) {
+      throw new BadRequestException('idToken or accessToken is required');
+    }
+
+    let googleId = '';
+    let email = '';
+    let name = 'User';
+    let picture: string | undefined;
+
+    if (dto.idToken) {
+      const audiences = this.getGoogleAudiences();
+      if (audiences.length === 0) {
+        throw new UnauthorizedException(
+          'Google auth is not configured (set GOOGLE_CLIENT_ID or GOOGLE_CLIENT_IDS)',
+        );
+      }
+
+      const client = new OAuth2Client();
+      let ticket;
+      try {
+        ticket = await client.verifyIdToken({ idToken: dto.idToken, audience: audiences });
+      } catch {
+        throw new UnauthorizedException('Invalid Google idToken');
+      }
+
+      // FIX: this block was truncated/missing in the original
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        throw new UnauthorizedException('Google token missing email');
+      }
+
+      googleId = payload.sub;
+      email = payload.email.toLowerCase();
+      name = payload.name ?? payload.email.split('@')[0] ?? 'User';
+      picture = payload.picture ?? undefined;
+
+    } else if (dto.accessToken) {
+      try {
+        const { data } = await axios.get<{
+          sub?: string;
+          email?: string;
+          name?: string;
+          picture?: string;
+        }>('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${dto.accessToken}` },
+          timeout: 7000,
+        });
+
+        if (!data?.sub || !data?.email) {
+          throw new UnauthorizedException('Google token missing profile/email');
+        }
+
+        googleId = data.sub;
+        email = data.email.toLowerCase();
+        name = data.name ?? data.email.split('@')[0] ?? 'User';
+        picture = data.picture ?? undefined;
+      } catch {
+        throw new UnauthorizedException('Invalid Google accessToken');
+      }
+    }
+
+    let user = await this.usersService.findByGoogleId(googleId);
+    if (!user) {
+      user = await this.usersService.findByEmail(email);
+      if (user) {
+        await this.usersService.linkGoogleId((user as any)._id.toString(), googleId);
+      } else {
+        user = await this.usersService.createFromGoogle({ email, name, googleId, picture });
+      }
+    }
+
+    const accessToken = await this.signToken({
+      sub: (user as any)._id.toString(),
+      email: user.email,
+    });
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
+  }
+
+  // ─── Apple OAuth ─────────────────────────────────────────────────────────────
+
+  async loginWithApple(dto: AppleAuthDto): Promise<AuthResponse> {
+    const audiences = this.getAppleAudiences();
+    if (audiences.length === 0) {
+      throw new UnauthorizedException(
+        'Apple auth backend not configured (set APPLE_AUDIENCE_IOS or APPLE_AUDIENCES)',
+      );
+    }
+
+    this.logger.log(`Apple auth audiences loaded: ${audiences.length}`);
+    const audienceOption: string | [string, ...string[]] =
+      audiences.length === 1 ? audiences[0] : (audiences as [string, ...string[]]);
+
+    try {
+      const decoded = jwt.verify(dto.identityToken, this.getAppleSigningKey, {
+        algorithms: ['RS256'],
+        issuer: 'https://appleid.apple.com',
+        audience: audienceOption,
+      }) as unknown as { sub?: string; email?: string; aud?: string | string[] };
+
+      if (!decoded.sub) {
+        throw new UnauthorizedException('Apple token missing sub');
+      }
+
+      const appleId = decoded.sub;
+      let email = decoded.email?.toLowerCase();
+      let name = 'User';
+
+      if (dto.user) {
+        try {
+          const appleUser = JSON.parse(dto.user) as {
+            name?: { firstName?: string; lastName?: string };
+            email?: string;
+          };
+          if (appleUser.name) {
+            const first = appleUser.name.firstName ?? '';
+            const last = appleUser.name.lastName ?? '';
+            name = [first, last].filter(Boolean).join(' ') || 'User';
+          }
+          if (appleUser.email) email = appleUser.email.toLowerCase();
+        } catch {
+          // ignore parse error
+        }
+      }
+
+      let user = await this.usersService.findByAppleId(appleId);
+      if (!user) {
+        if (email) user = await this.usersService.findByEmail(email);
+        if (user) {
+          (user as any).appleId = appleId;
+          await user.save();
+        } else {
+          user = await this.usersService.createUser({
+            name,
+            email: email ?? `apple-${appleId}@placeholder.local`,
+            password: null,
+            appleId,
+          });
+        }
+      }
+
+      const accessToken = await this.signToken({
+        sub: (user as any)._id.toString(),
+        email: user.email,
+      });
+
+      const audLog = Array.isArray(decoded.aud)
+        ? decoded.aud.join(',')
+        : (decoded.aud ?? 'n/a');
+      this.logger.log(`Apple auth verify success: aud=${audLog} sub=${appleId}`);
+
+      return { user: this.toUserPayload(user), accessToken, token: accessToken };
+    } catch (e) {
+      this.logger.warn('Apple auth verify failed');
+      if (e instanceof UnauthorizedException) throw e;
+      throw new UnauthorizedException('Invalid Apple token');
+    }
+  }
+
+  // ─── Profile & Password ──────────────────────────────────────────────────────
+
+  async validateUserById(userId: string): Promise<UserDocument | null> {
+    return this.usersService.findById(userId);
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: {
+      name?: string;
+      role?: string | null;
+      location?: string | null;
+      phone?: string | null;
+      birthDate?: string | null;
+      bio?: string | null;
+      avatarUrl?: string | null;
+      conversationsCount?: number;
+      hoursSaved?: number;
+    },
+  ): Promise<UserDocument | null> {
+    return this.usersService.updateProfile(userId, dto);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+    if (!user.password) {
+      throw new BadRequestException(
+        'This account has no password (signed in with Google/Apple). Use reset password instead.',
+      );
+    }
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) throw new UnauthorizedException('Current password is incorrect');
+
+    (user as any).password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await user.save();
+  }
+
+  // ─── Admin: Impersonation ────────────────────────────────────────────────────
+
+  /**
+   * Permet à un admin de générer un token JWT pour un autre utilisateur (impersonation).
+   * FIX: méthode déplacée à l'intérieur de la classe (était orpheline dans l'original).
+   */
+  async impersonateUser(
+    admin: UserDocument,
+    targetUserId: string,
+  ): Promise<{ token: string }> {
+    if (!admin || (admin as any).role !== 'admin') {
+      throw new UnauthorizedException('Only admins can impersonate users');
+    }
+
+    const user = await this.usersService.findById(targetUserId);
+    if (!user) {
+      throw new BadRequestException('User to impersonate not found');
+    }
+
+    const payload = {
+      sub: (user as any)._id.toString(),
+      email: user.email,
+      role: (user as any).role,
+      impersonatedBy:
+        (admin as any)._id?.toString?.() ?? (admin as any).id ?? null,
+    };
+
+    const token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+
+    this.logger.log(
+      `[IMPERSONATE] Admin ${admin.email} (${(admin as any)._id}) impersonated ` +
+      `user ${user.email} (${(user as any)._id}) at ${new Date().toISOString()}`,
+    );
+    // TODO: Enregistrer dans une vraie table d'audit si besoin
+
+    return { token };
   }
 }

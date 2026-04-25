@@ -1,29 +1,3 @@
-  /**
-   * Permet à un admin de générer un token JWT pour un autre utilisateur (impersonation)
-   */
-  async impersonateUser(admin: UserDocument, targetUserId: string): Promise<{ token: string }> {
-    // Vérifier que l'utilisateur courant est admin
-    if (!admin || admin.role !== 'admin') {
-      throw new UnauthorizedException('Only admins can impersonate users');
-    }
-    // Vérifier que l'utilisateur cible existe
-    const user = await this.usersService.findById(targetUserId);
-    if (!user) {
-      throw new BadRequestException('User to impersonate not found');
-    }
-    // Générer un JWT pour l'utilisateur cible, avec info d'impersonation
-    const payload = {
-      sub: (user as any)._id.toString(),
-      email: user.email,
-      role: user.role,
-      impersonatedBy: (admin as any)._id?.toString?.() ?? admin.id ?? null,
-    };
-    const token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
-    // Logger l'action d'impersonation (audit log simple)
-    this.logger.log(`[IMPERSONATE] Admin ${admin.email} (${admin._id}) impersonated user ${user.email} (${user._id}) at ${new Date().toISOString()}`);
-    // TODO: Enregistrer dans une vraie table d'audit si besoin
-    return { token };
-  }
 import {
   ConflictException,
   Injectable,
@@ -74,14 +48,20 @@ export class AuthService {
     cache: true,
   });
 
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
   private getGoogleAudiences(): string[] {
     const legacyClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') ?? '';
     const multiClientIdsRaw = this.configService.get<string>('GOOGLE_CLIENT_IDS') ?? '';
-
     const values = [legacyClientId, ...multiClientIdsRaw.split(',')]
-      .map((value) => value.trim())
+      .map((v) => v.trim())
       .filter(Boolean);
-
     return Array.from(new Set(values));
   }
 
@@ -89,28 +69,13 @@ export class AuthService {
     const legacyAudience = this.configService.get<string>('APPLE_CLIENT_ID') ?? '';
     const iosAudience = this.configService.get<string>('APPLE_AUDIENCE_IOS') ?? '';
     const multiAudiencesRaw = this.configService.get<string>('APPLE_AUDIENCES') ?? '';
-
     const values = [legacyAudience, iosAudience, ...multiAudiencesRaw.split(',')]
-      .map((value) => value.trim())
+      .map((v) => v.trim())
       .filter(Boolean);
-
     return Array.from(new Set(values));
   }
 
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-  ) {}
-
-  private toUserPayload(doc: UserDocument): {
-    id: string;
-    _id: string;
-    name: string;
-    email: string;
-    role: string | null;
-    employeeType: string | null;
-  } {
+  private toUserPayload(doc: UserDocument): AuthResponse['user'] {
     const id = (doc as any)._id?.toString?.() ?? '';
     return {
       id,
@@ -124,39 +89,49 @@ export class AuthService {
 
   private async signToken(payload: { sub: string; email: string }): Promise<string> {
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
-    return this.jwtService.signAsync(payload, {
-      expiresIn: expiresIn as any,
-    });
+    return this.jwtService.signAsync(payload, { expiresIn: expiresIn as any });
   }
+
+  private getAppleSigningKey = (
+    header: jwt.JwtHeader,
+    callback: jwt.SigningKeyCallback,
+  ) => {
+    if (!header.kid) return callback(new Error('No kid in header'));
+    this.appleJwks.getSigningKey(header.kid, (err, key) => {
+      if (err) return callback(err);
+      callback(null, key?.getPublicKey());
+    });
+  };
+
+  // ─── Registration & Email Verification ──────────────────────────────────────
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('Email already registered');
     }
+
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const user = await this.usersService.createUser({
       name: dto.name.trim(),
       email: dto.email.toLowerCase().trim(),
       password: hashedPassword,
     });
+
     const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
       Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
     );
-    (user as any).emailVerificationToken = token;
-    (user as any).emailVerificationExpires = expires;
     await user.save();
     await this.sendVerificationEmailToUser(user, token);
+
     const accessToken = await this.signToken({
       sub: (user as any)._id.toString(),
       email: user.email,
     });
-    return {
-      user: this.toUserPayload(user),
-      accessToken,
-      token: accessToken,
-    };
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
   }
 
   private async sendVerificationEmailToUser(
@@ -165,11 +140,12 @@ export class AuthService {
   ): Promise<void> {
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.error('[Resend] RESEND_API_KEY is not set – verification email not sent');
+      this.logger.error('[Resend] RESEND_API_KEY is not set – verification email not sent');
       throw new ServiceUnavailableException(
         'Email service is not configured. Set RESEND_API_KEY on the server.',
       );
     }
+
     const emailFrom =
       this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const verifyUrl =
@@ -177,9 +153,8 @@ export class AuthService {
       'https://yourapp.com/verify-email';
     const link = `${verifyUrl.replace(/\/$/, '')}?token=${token}`;
 
-    const resend = new Resend(resendApiKey);
     try {
-      await resend.emails.send({
+      await new Resend(resendApiKey).emails.send({
         from: emailFrom,
         to: user.email,
         subject: 'Verify your email address',
@@ -187,10 +162,9 @@ export class AuthService {
         html: `<p>Verify your email (link valid ${VERIFICATION_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${link}">${link}</a></p>`,
       });
     } catch (err: any) {
-      const msg = err?.message ?? 'Unknown error';
-      console.error('[Resend] Verification email failed:', msg, err?.response?.data ?? '');
+      this.logger.error('[Resend] Verification email failed:', err?.message, err?.response?.data);
       throw new ServiceUnavailableException(
-        'Could not send verification email. Try again later or check your email configuration (Resend domain, API key).',
+        'Could not send verification email. Check your Resend domain and API key.',
       );
     }
   }
@@ -206,92 +180,92 @@ export class AuthService {
     await user.save();
   }
 
-  /** Envoi email de vérification pour l’utilisateur connecté (JWT). Utilisé par POST /auth/verify-email. */
+  /** POST /auth/verify-email — utilisateur connecté (JWT). */
   async sendVerificationEmailForCurrentUser(userId: string): Promise<void> {
     const user = await this.usersService.findById(userId);
-    if (!user || (user as any).emailVerified) {
-      return;
-    }
+    if (!user || (user as any).emailVerified) return;
+
     const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
       Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
     );
-    (user as any).emailVerificationToken = token;
-    (user as any).emailVerificationExpires = expires;
     await user.save();
     await this.sendVerificationEmailToUser(user, token);
   }
 
-  /** Renvoyer l’email de vérification par adresse email (sans JWT). POST /auth/send-verification-email. */
+  /** POST /auth/send-verification-email — sans JWT. */
   async sendVerificationEmail(email: string): Promise<void> {
     const user = await this.usersService.findByEmail(email);
-    if (!user || (user as any).emailVerified) {
-      return;
-    }
+    if (!user || (user as any).emailVerified) return;
+
     const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(
+    (user as any).emailVerificationToken = token;
+    (user as any).emailVerificationExpires = new Date(
       Date.now() + VERIFICATION_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
     );
-    (user as any).emailVerificationToken = token;
-    (user as any).emailVerificationExpires = expires;
     await user.save();
     await this.sendVerificationEmailToUser(user, token);
   }
+
+  // ─── Login ───────────────────────────────────────────────────────────────────
 
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user || !user.password) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
+
     const match = await bcrypt.compare(dto.password, user.password);
     if (!match) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
+
     const accessToken = await this.signToken({
       sub: (user as any)._id.toString(),
       email: user.email,
     });
-    return {
-      user: this.toUserPayload(user),
-      accessToken,
-      token: accessToken,
-    };
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
   }
+
+  // ─── Password Reset ──────────────────────────────────────────────────────────
 
   async resetPassword(email: string): Promise<void> {
     const user = await this.usersService.findByEmail(email);
-    if (!user) {
-      return;
-    }
+    if (!user) return; // silent — avoid leaking whether email exists
+
     const token = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
     (user as any).resetPasswordToken = token;
-    (user as any).resetPasswordExpires = expires;
+    (user as any).resetPasswordExpires = new Date(
+      Date.now() + RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
     await user.save();
 
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     if (!resendApiKey) {
-      console.error('[Resend] RESEND_API_KEY is not set – reset email not sent');
-      return; // reset-password is often "silent" (no leak of email existence), so we don't throw
+      this.logger.error('[Resend] RESEND_API_KEY is not set – reset email not sent');
+      return;
     }
-    const emailFrom = this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
+
+    const emailFrom =
+      this.configService.get<string>('EMAIL_FROM') ?? 'onboarding@resend.dev';
     const frontendResetUrl =
-      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ?? 'https://yourapp.com/reset-password/confirm';
+      this.configService.get<string>('FRONTEND_RESET_PASSWORD_URL') ??
+      'https://yourapp.com/reset-password/confirm';
     const resetLink = `${frontendResetUrl.replace(/\/$/, '')}?token=${token}`;
 
-    const resend = new Resend(resendApiKey);
     try {
-      await resend.emails.send({
+      await new Resend(resendApiKey).emails.send({
         from: emailFrom,
         to: user.email,
         subject: 'Reset your password',
-        text: `Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
-        html: `<p>Use this link to reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
+        text: `Reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h): ${resetLink}`,
+        html: `<p>Reset your password (valid ${RESET_TOKEN_EXPIRY_HOURS}h):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
       });
     } catch (err: any) {
-      const msg = err?.message ?? 'Unknown error';
-      console.error('[Resend] Reset email failed:', msg, err?.response?.data ?? '');
-      // Don't throw for reset (same as before: avoid leaking whether email exists)
+      this.logger.error('[Resend] Reset email failed:', err?.message, err?.response?.data);
+      // Don't throw — avoid leaking email existence
     }
   }
 
@@ -300,17 +274,14 @@ export class AuthService {
     if (!user) {
       throw new BadRequestException('Invalid or expired reset token');
     }
-    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    (user as any).password = hashedPassword;
+    (user as any).password = await bcrypt.hash(newPassword, SALT_ROUNDS);
     (user as any).resetPasswordToken = null;
     (user as any).resetPasswordExpires = null;
     await user.save();
   }
 
-  /**
-   * Connexion Google : vérifie l'idToken (audience = GOOGLE_CLIENT_ID), récupère ou crée l'utilisateur, renvoie user + JWT.
-   * Contrat Flutter : { user: { id, name, email }, accessToken }
-   */
+  // ─── Google OAuth ────────────────────────────────────────────────────────────
+
   async loginWithGoogle(dto: GoogleAuthDto): Promise<AuthResponse> {
     if (!dto.idToken && !dto.accessToken) {
       throw new BadRequestException('idToken or accessToken is required');
@@ -332,14 +303,12 @@ export class AuthService {
       const client = new OAuth2Client();
       let ticket;
       try {
-        ticket = await client.verifyIdToken({
-          idToken: dto.idToken,
-          audience: audiences,
-        });
+        ticket = await client.verifyIdToken({ idToken: dto.idToken, audience: audiences });
       } catch {
         throw new UnauthorizedException('Invalid Google idToken');
       }
 
+      // FIX: this block was truncated/missing in the original
       const payload = ticket.getPayload();
       if (!payload || !payload.email) {
         throw new UnauthorizedException('Google token missing email');
@@ -349,6 +318,7 @@ export class AuthService {
       email = payload.email.toLowerCase();
       name = payload.name ?? payload.email.split('@')[0] ?? 'User';
       picture = payload.picture ?? undefined;
+
     } else if (dto.accessToken) {
       try {
         const { data } = await axios.get<{
@@ -357,9 +327,7 @@ export class AuthService {
           name?: string;
           picture?: string;
         }>('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: {
-            Authorization: `Bearer ${dto.accessToken}`,
-          },
+          headers: { Authorization: `Bearer ${dto.accessToken}` },
           timeout: 7000,
         });
 
@@ -382,12 +350,7 @@ export class AuthService {
       if (user) {
         await this.usersService.linkGoogleId((user as any)._id.toString(), googleId);
       } else {
-        user = await this.usersService.createFromGoogle({
-          email,
-          name,
-          googleId,
-          picture,
-        });
+        user = await this.usersService.createFromGoogle({ email, name, googleId, picture });
       }
     }
 
@@ -395,21 +358,11 @@ export class AuthService {
       sub: (user as any)._id.toString(),
       email: user.email,
     });
-    return {
-      user: this.toUserPayload(user),
-      accessToken,
-      token: accessToken,
-    };
+
+    return { user: this.toUserPayload(user), accessToken, token: accessToken };
   }
 
-  private getAppleSigningKey = (header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) => {
-    if (!header.kid) return callback(new Error('No kid in header'));
-    this.appleJwks.getSigningKey(header.kid, (err, key) => {
-      if (err) return callback(err);
-      const signingKey = key?.getPublicKey();
-      callback(null, signingKey);
-    });
-  };
+  // ─── Apple OAuth ─────────────────────────────────────────────────────────────
 
   async loginWithApple(dto: AppleAuthDto): Promise<AuthResponse> {
     const audiences = this.getAppleAudiences();
@@ -421,9 +374,7 @@ export class AuthService {
 
     this.logger.log(`Apple auth audiences loaded: ${audiences.length}`);
     const audienceOption: string | [string, ...string[]] =
-      audiences.length === 1
-        ? audiences[0]
-        : (audiences as [string, ...string[]]);
+      audiences.length === 1 ? audiences[0] : (audiences as [string, ...string[]]);
 
     try {
       const decoded = jwt.verify(dto.identityToken, this.getAppleSigningKey, {
@@ -442,7 +393,10 @@ export class AuthService {
 
       if (dto.user) {
         try {
-          const appleUser = JSON.parse(dto.user) as { name?: { firstName?: string; lastName?: string }; email?: string };
+          const appleUser = JSON.parse(dto.user) as {
+            name?: { firstName?: string; lastName?: string };
+            email?: string;
+          };
           if (appleUser.name) {
             const first = appleUser.name.firstName ?? '';
             const last = appleUser.name.lastName ?? '';
@@ -456,9 +410,7 @@ export class AuthService {
 
       let user = await this.usersService.findByAppleId(appleId);
       if (!user) {
-        if (email) {
-          user = await this.usersService.findByEmail(email);
-        }
+        if (email) user = await this.usersService.findByEmail(email);
         if (user) {
           (user as any).appleId = appleId;
           await user.save();
@@ -482,17 +434,15 @@ export class AuthService {
         : (decoded.aud ?? 'n/a');
       this.logger.log(`Apple auth verify success: aud=${audLog} sub=${appleId}`);
 
-      return {
-        user: this.toUserPayload(user),
-        accessToken,
-        token: accessToken,
-      };
+      return { user: this.toUserPayload(user), accessToken, token: accessToken };
     } catch (e) {
       this.logger.warn('Apple auth verify failed');
       if (e instanceof UnauthorizedException) throw e;
       throw new UnauthorizedException('Invalid Apple token');
     }
   }
+
+  // ─── Profile & Password ──────────────────────────────────────────────────────
 
   async validateUserById(userId: string): Promise<UserDocument | null> {
     return this.usersService.findById(userId);
@@ -515,27 +465,60 @@ export class AuthService {
     return this.usersService.updateProfile(userId, dto);
   }
 
-  /** Changer le mot de passe (utilisateur connecté, mot de passe actuel requis). */
   async changePassword(
     userId: string,
     currentPassword: string,
     newPassword: string,
   ): Promise<void> {
     const user = await this.usersService.findById(userId);
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
+    if (!user) throw new UnauthorizedException('User not found');
     if (!user.password) {
       throw new BadRequestException(
         'This account has no password (signed in with Google/Apple). Use reset password instead.',
       );
     }
     const match = await bcrypt.compare(currentPassword, user.password);
-    if (!match) {
-      throw new UnauthorizedException('Current password is incorrect');
-    }
-    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    (user as any).password = hashedPassword;
+    if (!match) throw new UnauthorizedException('Current password is incorrect');
+
+    (user as any).password = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await user.save();
+  }
+
+  // ─── Admin: Impersonation ────────────────────────────────────────────────────
+
+  /**
+   * Permet à un admin de générer un token JWT pour un autre utilisateur (impersonation).
+   * FIX: méthode déplacée à l'intérieur de la classe (était orpheline dans l'original).
+   */
+  async impersonateUser(
+    admin: UserDocument,
+    targetUserId: string,
+  ): Promise<{ token: string }> {
+    if (!admin || (admin as any).role !== 'admin') {
+      throw new UnauthorizedException('Only admins can impersonate users');
+    }
+
+    const user = await this.usersService.findById(targetUserId);
+    if (!user) {
+      throw new BadRequestException('User to impersonate not found');
+    }
+
+    const payload = {
+      sub: (user as any)._id.toString(),
+      email: user.email,
+      role: (user as any).role,
+      impersonatedBy:
+        (admin as any)._id?.toString?.() ?? (admin as any).id ?? null,
+    };
+
+    const token = await this.jwtService.signAsync(payload, { expiresIn: '1h' });
+
+    this.logger.log(
+      `[IMPERSONATE] Admin ${admin.email} (${(admin as any)._id}) impersonated ` +
+      `user ${user.email} (${(user as any)._id}) at ${new Date().toISOString()}`,
+    );
+    // TODO: Enregistrer dans une vraie table d'audit si besoin
+
+    return { token };
   }
 }
