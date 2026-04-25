@@ -12,7 +12,10 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 class ImpersonateDto {
-  userId!: string;
+  userId?: string;
+  id?: string;
+  targetUserId?: string;
+  user?: { id?: string; _id?: string } | string;
 }
 
 @Controller()
@@ -37,15 +40,35 @@ export class ImpersonationController {
     return this.impersonate(req, dto);
   }
 
+  private resolveTargetUserId(dto: ImpersonateDto): string | null {
+    const nestedUserId =
+      typeof dto?.user === 'string'
+        ? dto.user
+        : dto?.user?.id ?? dto?.user?._id ?? null;
+
+    const candidate =
+      dto?.userId ?? dto?.targetUserId ?? dto?.id ?? nestedUserId ?? null;
+
+    if (typeof candidate !== 'string') {
+      return null;
+    }
+
+    const normalized = candidate.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
   private async impersonate(req: Request, dto: ImpersonateDto) {
-    if (!dto?.userId || !Types.ObjectId.isValid(dto.userId)) {
+    const targetUserId = this.resolveTargetUserId(dto);
+
+    if (!targetUserId || !Types.ObjectId.isValid(targetUserId)) {
       throw new UnprocessableEntityException({
-        message: 'userId is required and must be a valid ObjectId',
+        message:
+          'A valid target user id is required (accepted: userId, targetUserId, id, user.id, user._id).',
         code: 'INVALID_IMPERSONATION_PAYLOAD',
       });
     }
 
-    const result = await this.authService.impersonateUser(req.user as any, dto.userId, {
+    const result = await this.authService.impersonateUser(req.user as any, targetUserId, {
       ip: req.ip,
       userAgent: req.headers['user-agent'] ?? null,
     });
