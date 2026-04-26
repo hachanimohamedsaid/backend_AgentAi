@@ -30,7 +30,11 @@ export class GoogleConnectService {
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/drive.readonly',
+      // drive.file lets the app create and manage files it owns (e.g. the
+      // AVA Knowledge Base folder + RAG PDFs). drive.readonly alone is
+      // insufficient because Drive API rejects folder creation / uploads
+      // with a 403 "insufficientFilePermissions" error.
+      'https://www.googleapis.com/auth/drive.file',
     ].join(' ');
 
     const params = new URLSearchParams({
