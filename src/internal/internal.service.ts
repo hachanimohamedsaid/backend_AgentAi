@@ -188,6 +188,20 @@ export class InternalService {
     return { success: true };
   }
 
+  async markDispatched(id: string) {
+    await this.projectModel.findByIdAndUpdate(id, {
+      $set: { trelloDispatchDone: true }
+    }).exec();
+    return { success: true };
+  }
+
+  async resetDispatch(id: string) {
+    await this.projectModel.findByIdAndUpdate(id, {
+      $set: { trelloDispatchDone: false }
+    }).exec();
+    return { success: true };
+  }
+
   async dispatchProject(rowNumber: string, body: any) {
     const project = await this.projectModel.findOne({ 
       row_number: parseInt(rowNumber) 

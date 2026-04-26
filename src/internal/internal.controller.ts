@@ -66,6 +66,16 @@ export class InternalController {
     return this.internalService.completeTask(id);
   }
 
+  @Patch('projects/:id/mark-dispatched')
+  async markDispatched(@Param('id') id: string) {
+    return this.internalService.markDispatched(id);
+  }
+
+  @Patch('projects/:id/reset-dispatch')
+  async resetDispatch(@Param('id') id: string) {
+    return this.internalService.resetDispatch(id);
+  }
+
   @Post('projects/:rowNumber/dispatch')
   async dispatchProject(
     @Param('rowNumber') rowNumber: string,
