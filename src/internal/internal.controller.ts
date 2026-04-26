@@ -41,11 +41,6 @@ export class InternalController {
     return this.internalService.getEmployee(id);
   }
 
-  @Patch('tasks/:id/trello-card')
-  saveTrelloCard(@Param('id') id: string, @Body() body: any) {
-    return this.internalService.saveTrelloCard(id, body);
-  }
-
   @Patch('tasks/:id/assign')
   assignTask(@Param('id') id: string, @Body() body: any) {
     return this.internalService.assignTask(id, body.employeeId);
@@ -56,19 +51,19 @@ export class InternalController {
     return this.internalService.rejectTask(id, body.employeeId);
   }
 
+  @Patch('tasks/:id/start')
+  startTask(@Param('id') id: string) {
+    return this.internalService.startTask(id);
+  }
+
+  @Patch('tasks/:id/reset')
+  resetTask(@Param('id') id: string) {
+    return this.internalService.resetTask(id);
+  }
+
   @Patch('tasks/:id/complete')
   completeTask(@Param('id') id: string) {
     return this.internalService.completeTask(id);
-  }
-
-  @Patch('projects/:id/mark-dispatched')
-  markDispatched(@Param('id') id: string) {
-    return this.internalService.markDispatched(id);
-  }
-
-  @Patch('projects/:id/reset-dispatch')
-  async resetDispatch(@Param('id') id: string) {
-    return this.internalService.resetDispatch(id);
   }
 
   @Post('projects/:rowNumber/dispatch')

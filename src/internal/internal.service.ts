@@ -18,12 +18,12 @@ export class InternalService {
   ) {}
 
   async getAcceptedProjects() {
-    const projects = await this.projectModel.find({
-      $or: [
-        { trelloDispatchDone: { $ne: true } },
-        { trelloDispatchDone: { $exists: false } }
-      ]
-    }).sort({ updatedAt: -1 }).exec();
+    const projects = await this.projectModel
+      .find({
+        $or: [{ status: /^accepted$/i }, { status: /^accept$/i }],
+      })
+      .sort({ updatedAt: -1 })
+      .exec();
     return projects;
   }
 
@@ -62,11 +62,6 @@ export class InternalService {
         deliverable: t.deliverable,
         sprintId: String(t.sprintId),
         sprintTitle: sprint?.title ?? '',
-        trelloCardId: t.trelloCardId ?? null,
-        trelloListDoneId: t.trelloListDoneId ?? null,
-        trelloListInProgressId: t.trelloListInProgressId ?? null,
-        trelloListTodoId: t.trelloListTodoId ?? null,
-        trelloBoardId: t.trelloBoardId ?? null,
         assignedEmployee: assignedEmployee ? {
           fullName: assignedEmployee.fullName,
           email: assignedEmployee.email
@@ -90,11 +85,6 @@ export class InternalService {
       status: t.status,
       deliverable: t.deliverable,
       sprintId: String(t.sprintId),
-      trelloCardId: t.trelloCardId ?? null,
-      trelloListDoneId: t.trelloListDoneId ?? null,
-      trelloListInProgressId: t.trelloListInProgressId ?? null,
-      trelloListTodoId: t.trelloListTodoId ?? null,
-      trelloBoardId: t.trelloBoardId ?? null
     };
   }
 
@@ -116,9 +106,6 @@ export class InternalService {
         estimatedHours: t.estimatedHours,
         status: t.status,
         deliverable: t.deliverable,
-        trelloCardId: t.trelloCardId ?? null,
-        trelloListDoneId: t.trelloListDoneId ?? null,
-        trelloListInProgressId: t.trelloListInProgressId ?? null,
         sprintTitle: sprint?.title ?? '',
         projectTitle: project?.title ?? ''
       };
@@ -127,19 +114,6 @@ export class InternalService {
 
   async getEmployee(id: string) {
     return this.employeeModel.findById(id).exec();
-  }
-
-  async saveTrelloCard(id: string, body: any) {
-    await this.taskModel.findByIdAndUpdate(id, {
-      $set: {
-        trelloCardId: body.trelloCardId,
-        trelloBoardId: body.trelloBoardId,
-        trelloListTodoId: body.trelloListTodoId,
-        trelloListInProgressId: body.trelloListInProgressId,
-        trelloListDoneId: body.trelloListDoneId
-      }
-    }).exec();
-    return { success: true };
   }
 
   async assignTask(id: string, employeeId: string) {
@@ -193,25 +167,25 @@ export class InternalService {
     return { success: true };
   }
 
+  async startTask(id: string) {
+    await this.taskModel.findByIdAndUpdate(id, {
+      $set: { status: 'in_progress' },
+    }).exec();
+    return { success: true };
+  }
+
+  async resetTask(id: string) {
+    await this.taskModel.findByIdAndUpdate(id, {
+      $set: { status: 'todo' },
+    }).exec();
+    return { success: true };
+  }
+
   async completeTask(id: string) {
     await this.taskModel.findByIdAndUpdate(id, {
       $set: { status: 'done' }
     }).exec();
     return { success: true };
-  }
-
-  async markDispatched(id: string) {
-    await this.projectModel.findByIdAndUpdate(id, {
-      $set: { trelloDispatchDone: true }
-    }).exec();
-    return { success: true };
-  }
-
-  async resetDispatch(id: string) {
-    await this.projectModel.findByIdAndUpdate(id, {
-      $set: { trelloDispatchDone: false }
-    }).exec();
-    return { success: true, message: 'Project reset, ready for dispatch again' };
   }
 
   async dispatchProject(rowNumber: string, body: any) {

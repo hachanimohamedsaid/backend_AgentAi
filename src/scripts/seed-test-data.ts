@@ -22,7 +22,6 @@ async function seed() {
       budget_estime: 5000,
       periode: '1 mois',
       tags: ['web', 'design', 'marketing'],
-      trelloDispatchDone: false,
       createdAt: new Date(),
       updatedAt: new Date()
     });

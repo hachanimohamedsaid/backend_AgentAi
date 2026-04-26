@@ -34,21 +34,6 @@ export class Task {
   @Prop({ type: MongooseSchema.Types.ObjectId, required: true, ref: 'Sprint', index: true })
   sprintId: string;
 
-  @Prop({ default: null })
-  trelloCardId: string;
-
-  @Prop({ default: null })
-  trelloBoardId: string;
-
-  @Prop({ default: null })
-  trelloListTodoId: string;
-
-  @Prop({ default: null })
-  trelloListInProgressId: string;
-
-  @Prop({ default: null })
-  trelloListDoneId: string;
-
   @Prop({ type: [String], default: [] })
   rejectedBy: string[];
 }

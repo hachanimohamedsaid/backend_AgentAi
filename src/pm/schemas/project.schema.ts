@@ -34,9 +34,6 @@ export class Project {
   @Prop({ type: [String], default: [] })
   tags: string[];
 
-  @Prop({ default: false })
-  trelloDispatchDone: boolean;
-
   createdAt?: Date;
   updatedAt?: Date;
 }
