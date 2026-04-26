@@ -28,6 +28,7 @@ import { PrometheusMiddleware } from './observability/prometheus.middleware';
 import { LoggerService } from './observability/logger.service';
 import { ProjectDispatchModule } from './project-dispatch/project-dispatch.module';
 import { RhModule } from './rh/rh.module';
+import { MessagingModule } from './messaging/messaging.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { RhModule } from './rh/rh.module';
     InternalModule,
     ProjectDispatchModule,
     RhModule,
+    MessagingModule,
   ],
   controllers: [AppController],
   providers: [AppService, LoggerService],

@@ -11,6 +11,7 @@ import {
   Headers,
   NotFoundException,
   UnauthorizedException,
+  Query,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IsString, IsNotEmpty } from 'class-validator';
@@ -114,6 +115,20 @@ export class UsersController {
       badges: user.badges || [],
       championMonths: user.championMonths || [],
     };
+  }
+
+  @Get('search')
+  @UseGuards(JwtAuthGuard)
+  async searchUsers(@Request() req, @Query('q') q: string) {
+    const users = await this.usersService.searchUsers(q, req.user.id);
+    return users.map((u: any) => ({
+      id: u._id?.toString?.() ?? String(u._id),
+      name: u.name ?? '',
+      avatarUrl: u.avatarUrl ?? null,
+      role: u.role ?? null,
+      employeeType: u.employeeType ?? null,
+      department: u.department ?? null,
+    }));
   }
 
   @Post('telegram-link-token')

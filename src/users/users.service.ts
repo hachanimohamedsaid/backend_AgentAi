@@ -304,6 +304,24 @@ export class UsersService {
     return this.userModel.findOne({ telegramChatId: chatId }).exec();
   }
 
+  async searchUsers(query: string, excludeUserId?: string) {
+    const q = (query ?? '').trim();
+    if (!q) return [];
+    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    const filter: any = {
+      $or: [{ name: regex }, { email: regex }],
+    };
+    if (excludeUserId) {
+      filter._id = { $ne: excludeUserId };
+    }
+    return this.userModel
+      .find(filter)
+      .select('_id name avatarUrl role employeeType department')
+      .limit(20)
+      .lean()
+      .exec();
+  }
+
   async saveTelegramChatId(userId: string, chatId: string): Promise<void> {
     await this.userModel
       .updateOne({ _id: userId }, { telegramChatId: chatId })
