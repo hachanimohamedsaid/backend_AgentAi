@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
+import { UsersModule } from '../users/users.module';
 import { MessagingController } from './messaging.controller';
 import { MessagingGateway } from './messaging.gateway';
 import { MessagingService } from './messaging.service';
@@ -12,6 +13,7 @@ import { Message, MessageSchema } from './schemas/message.schema';
   imports: [
     ConfigModule,
     JwtModule.register({}),
+    UsersModule,
     MongooseModule.forFeature([
       { name: Conversation.name, schema: ConversationSchema },
       { name: Message.name, schema: MessageSchema },

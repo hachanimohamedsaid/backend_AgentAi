@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import {
   Conversation,
   ConversationDocument,
@@ -19,8 +20,8 @@ export class MessagingService {
     private readonly conversationModel: Model<ConversationDocument>,
     @InjectModel(Message.name)
     private readonly messageModel: Model<MessageDocument>,
-    @InjectModel('User')
-    private readonly userModel: Model<any>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {}
 
   private _ensureObjectId(id: string, label: string): Types.ObjectId {
