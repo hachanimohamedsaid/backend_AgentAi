@@ -74,6 +74,11 @@ export class InternalController {
     return this.internalService.completeTask(id);
   }
 
+  @Post('tasks/:id/done')
+  async markTaskDone(@Param('id') id: string, @Body() body: any) {
+    return this.internalService.markTaskDoneAndNotify(id, body.employeeId);
+  }
+
   @Patch('projects/:id/mark-dispatched')
   async markDispatched(@Param('id') id: string) {
     return this.internalService.markDispatched(id);

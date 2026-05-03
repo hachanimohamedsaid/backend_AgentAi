@@ -201,6 +201,28 @@ export class InternalService {
     return { success: true };
   }
 
+  async markTaskDoneAndNotify(taskId: string, employeeId: string) {
+    await this.taskModel.findByIdAndUpdate(taskId, {
+      $set: { status: 'done' },
+    }).exec();
+
+    try {
+      const axios = require('axios');
+      await axios.post(
+        'https://n8n-production-1e13.up.railway.app/webhook/ava-task-complete',
+        { taskId, employeeId },
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    } catch (e) {
+      console.log(
+        'N8N notification failed:',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+
+    return { success: true };
+  }
+
   async markDispatched(id: string) {
     await this.projectModel.findByIdAndUpdate(id, {
       $set: { trelloDispatchDone: true }
