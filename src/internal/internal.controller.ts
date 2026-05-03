@@ -41,6 +41,14 @@ export class InternalController {
     return this.internalService.getEmployee(id);
   }
 
+  @Patch('employees/:oldId/merge/:newId')
+  mergeEmployee(
+    @Param('oldId') oldId: string,
+    @Param('newId') newId: string,
+  ) {
+    return this.internalService.mergeEmployee(oldId, newId);
+  }
+
   @Patch('tasks/:id/assign')
   assignTask(@Param('id') id: string, @Body() body: any) {
     return this.internalService.assignTask(id, body.employeeId);

@@ -116,6 +116,19 @@ export class InternalService {
     return this.employeeModel.findById(id).exec();
   }
 
+  async mergeEmployee(oldId: string, newId: string) {
+    const result = await this.taskModel
+      .updateMany(
+        { assignedEmployeeId: oldId },
+        { $set: { assignedEmployeeId: newId } },
+      )
+      .exec();
+    return {
+      success: true,
+      tasksUpdated: result.modifiedCount,
+    };
+  }
+
   async assignTask(id: string, employeeId: string) {
     try {
       const task = await this.taskModel.findById(id).exec();
